@@ -11,9 +11,9 @@ const ui = {
 };
 
 const modes = {
-  easy: { label: "Easy", lives: 5, heatRate: 1050, spawnBoost: 0.12, pickupDelay: -0.25, abilityBias: 1 },
-  medium: { label: "Medium", lives: 3, heatRate: 850, spawnBoost: 0, pickupDelay: 0.55, abilityBias: 0.58 },
-  hard: { label: "Hard", lives: 1, heatRate: 650, spawnBoost: -0.12, pickupDelay: 1.25, abilityBias: 0.28 },
+  easy: { label: "Easy", lives: 5, heatRate: 1050, spawnOffset: 0.12, pickupDelay: -0.25, abilityBias: 1 },
+  medium: { label: "Medium", lives: 3, heatRate: 850, spawnOffset: 0, pickupDelay: 0.55, abilityBias: 0.58 },
+  hard: { label: "Hard", lives: 1, heatRate: 650, spawnOffset: -0.12, pickupDelay: 1.25, abilityBias: 0.28 },
 };
 
 const lanes = [-210, 0, 210];
@@ -29,12 +29,11 @@ const pickupTypes = [
   { id: "life", label: "Extra Life", color: "#ff4f64", width: 56, height: 56 },
   { id: "autopilot", label: "Autopilot", color: "#37d5ff", width: 60, height: 60 },
   { id: "immortal", label: "Immortality", color: "#ffd447", width: 60, height: 60 },
-  { id: "boost", label: "Boost", color: "#54e08b", width: 56, height: 56 },
   { id: "cash", label: "Cash", color: "#f7f7f2", width: 54, height: 54 },
 ];
 
 try {
-  const wipeVersion = "2026-06-22-leaderboard-wipe-1";
+  const wipeVersion = "2026-06-22-leaderboard-wipe-2";
   if (localStorage.getItem("boltHeistLeaderboardWipeVersion") !== wipeVersion) {
     localStorage.removeItem("boltHeistLeaderboards");
     localStorage.setItem("boltHeistLeaderboardWipeVersion", wipeVersion);
@@ -57,12 +56,12 @@ const cosmetics = [
 ];
 
 const shopUpgrades = [
-  { id: "starter-boost", name: "Starter Boost", cost: 160, note: "Begin each run with extra boost energy." },
+  { id: "launch-tune", name: "Launch Tune", cost: 160, note: "Start each run at a higher speed." },
   { id: "turbo-tune", name: "Turbo Tune", cost: 240, note: "Raises top speed a little." },
   { id: "street-grip", name: "Street Grip", cost: 260, note: "Improves lane switching." },
   { id: "cash-magnet", name: "Cash Magnet", cost: 300, note: "Cash pickups pay more." },
   { id: "reinforced-frame", name: "Reinforced Frame", cost: 380, note: "Start with one extra life." },
-  { id: "boost-tank", name: "Boost Tank", cost: 460, note: "Boost charges faster and hits harder." },
+  { id: "impact-dampers", name: "Impact Dampers", cost: 460, note: "Crashes slow the car down less." },
   { id: "pickup-radar", name: "Pickup Radar", cost: 540, note: "Road pickups appear more often." },
   { id: "bolt-jammer", name: "Heat Shield", cost: 700, note: "Heat rises slower during each run." },
   { id: "auto-chip", name: "Auto Chip", cost: 850, note: "Autopilot lasts longer." },
@@ -78,7 +77,6 @@ const state = {
   cash: 0,
   cashBanked: false,
   score: 0,
-  runUpgrades: { boost: 0 },
   lastStandUsed: false,
   player: {
     lane: 1,
@@ -86,7 +84,6 @@ const state = {
     y: 500,
     targetX: 0,
     speed: 88,
-    boostEnergy: 76,
     invulnerable: 0,
     immortal: 0,
     autopilot: 0,
@@ -212,14 +209,12 @@ function difficulty() {
   const heat = state.heat;
   const turbo = ownsUpgrade("turbo-tune") ? 9 : 0;
   const grip = ownsUpgrade("street-grip") ? 1.8 : 0;
-  const tank = ownsUpgrade("boost-tank") ? 8 : 0;
   const radar = ownsUpgrade("pickup-radar") ? -0.45 : 0;
   return {
-    topSpeed: 116 + turbo + state.runUpgrades.boost * 5,
+    topSpeed: 116 + turbo,
     accel: 18,
     handling: 8.9 + grip,
-    boostPower: 34 + tank + state.runUpgrades.boost * 6,
-    spawnEvery: Math.max(0.32, 0.96 + mode.spawnBoost - heat * 0.055),
+    spawnEvery: Math.max(0.32, 0.96 + mode.spawnOffset - heat * 0.055),
     pickupEvery: Math.max(1.75, 3.8 + mode.pickupDelay + radar - heat * 0.05),
     obstacleSpeed: 385 + heat * 27,
   };
@@ -328,7 +323,6 @@ function infoHtml() {
       <article><div class="sample pickup-sample life-sample">+</div><strong>Extra Life</strong><span>Adds one life and raises your life capacity. Car stays green.</span><div class="car-chip green-car">Car</div></article>
       <article><div class="sample pickup-sample auto-sample">A</div><strong>Autopilot</strong><span>Steers away from danger for 5 seconds.</span><div class="car-chip blue-car">Car turns blue</div></article>
       <article><div class="sample pickup-sample immortal-sample">I</div><strong>Immortality</strong><span>Hit obstacles safely for 5 seconds.</span><div class="car-chip rainbow-car">Car turns rainbow</div></article>
-      <article><div class="sample pickup-sample boost-sample">B</div><strong>Boost</strong><span>Refills boost and improves Space boost.</span><div class="car-chip green-car">Car stays green</div></article>
       <article><div class="sample pickup-sample cash-sample">$</div><strong>Cash</strong><span>Adds cash to your run score.</span><div class="car-chip green-car">Car stays green</div></article>
     </div>
     <div class="actions"><button data-view="menu" type="button">Back to Menu</button></div>
@@ -437,7 +431,7 @@ function resetRun(mode) {
   syncProfileFromInput();
   const config = modes[mode] || modes.medium;
   const bonusLife = ownsUpgrade("reinforced-frame") ? 1 : 0;
-  const starterBoost = ownsUpgrade("starter-boost") ? 24 : 0;
+  const launchBonus = ownsUpgrade("launch-tune") ? 18 : 0;
   state.mode = "playing";
   state.selectedMode = mode;
   state.maxLives = config.lives + bonusLife;
@@ -447,12 +441,10 @@ function resetRun(mode) {
   state.cashBanked = false;
   state.score = 0;
   state.lastStandUsed = false;
-  state.runUpgrades = { boost: 0 };
   state.player.lane = 1;
   state.player.x = 0;
   state.player.targetX = 0;
-  state.player.speed = 90;
-  state.player.boostEnergy = Math.min(100, 76 + starterBoost);
+  state.player.speed = 90 + launchBonus;
   state.player.invulnerable = 0;
   state.player.immortal = 0;
   state.player.autopilot = 0;
@@ -469,13 +461,6 @@ function switchLane(dir) {
   if (state.mode !== "playing" || state.player.autopilot > 0) return;
   state.player.lane = Math.max(0, Math.min(2, state.player.lane + dir));
   state.player.targetX = lanes[state.player.lane];
-}
-
-function useBoost() {
-  if (state.mode !== "playing" || state.player.boostEnergy < 30) return;
-  const d = difficulty();
-  state.player.speed = Math.min(d.topSpeed + d.boostPower, state.player.speed + d.boostPower);
-  state.player.boostEnergy -= 30;
 }
 
 function pickClearLane(blocked) {
@@ -505,7 +490,6 @@ function weightedPickupType() {
     ["life", 1.05 * abilityWeight],
     ["autopilot", 0.82 * abilityWeight],
     ["immortal", 0.62 * abilityWeight],
-    ["boost", 0.92 * abilityWeight],
     ["cash", 1.1 + state.heat * 0.16 + (1 - mode.abilityBias) * 2.4],
   ];
   const total = weights.reduce((sum, [, weight]) => sum + weight, 0);
@@ -548,7 +532,8 @@ function hitObstacle(entity) {
   }
   state.lives -= 1;
   p.invulnerable = 0.85;
-  p.speed = Math.max(46, p.speed - entity.penalty);
+  const penalty = entity.penalty * (ownsUpgrade("impact-dampers") ? 0.55 : 1);
+  p.speed = Math.max(46, p.speed - penalty);
   state.crashHeat += 1.7;
   if (state.lives <= 0 && ownsUpgrade("last-stand") && !state.lastStandUsed) {
     state.lastStandUsed = true;
@@ -574,10 +559,6 @@ function collectPickup(entity) {
   } else if (entity.id === "immortal") {
     p.immortal = 5;
     setMessage("Immortality active for 5 seconds.");
-  } else if (entity.id === "boost") {
-    state.runUpgrades.boost += 1;
-    p.boostEnergy = Math.min(100, p.boostEnergy + (ownsUpgrade("boost-tank") ? 70 : 54));
-    setMessage("Boost upgraded.");
   } else {
     const value = Math.round((25 + state.heat * 8) * (ownsUpgrade("cash-magnet") ? 1.5 : 1));
     state.cash += value;
@@ -600,7 +581,6 @@ function update(dt) {
   p.x += (p.targetX - p.x) * Math.min(1, dt * d.handling);
   p.speed += d.accel * dt;
   p.speed = Math.min(d.topSpeed, p.speed);
-  p.boostEnergy = Math.min(100, p.boostEnergy + (8 + (ownsUpgrade("boost-tank") ? 3 : 0) + state.runUpgrades.boost * 1.1) * dt);
 
   state.runDistance += p.speed * dt;
   state.score = Math.max(state.score, state.runDistance);
@@ -779,24 +759,10 @@ function drawPickup(pickup) {
   ctx.fillStyle = "#111318";
   ctx.font = "bold 21px sans-serif";
   ctx.textAlign = "center";
-  const label = { life: "+", autopilot: "A", immortal: "I", boost: "B", cash: "$" }[pickup.id];
+  const label = { life: "+", autopilot: "A", immortal: "I", cash: "$" }[pickup.id];
   ctx.fillText(label, 0, 8);
   ctx.textAlign = "left";
   ctx.restore();
-}
-
-function drawBoostBar() {
-  const w = 160;
-  const h = 12;
-  const x = canvas.width - w - 22;
-  const y = canvas.height - 30;
-  ctx.fillStyle = "rgba(255,255,255,0.16)";
-  roundedRect(x, y, w, h, 8);
-  ctx.fillStyle = "#37d5ff";
-  roundedRect(x, y, w * (state.player.boostEnergy / 100), h, 8);
-  ctx.fillStyle = "#f7f7f2";
-  ctx.font = "bold 12px sans-serif";
-  ctx.fillText("BOOST", x, y - 8);
 }
 
 function drawMessage() {
@@ -829,7 +795,6 @@ function draw() {
   drawRoad();
   state.entities.forEach((entity) => entity.kind === "pickup" ? drawPickup(entity) : drawObstacle(entity));
   drawCar(state.player.x, state.player.y, carColor());
-  drawBoostBar();
   drawScoreStrip();
   drawMessage();
 }
@@ -875,10 +840,6 @@ window.addEventListener("keydown", (event) => {
   }
   if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") switchLane(-1);
   if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") switchLane(1);
-  if (event.code === "Space") {
-    event.preventDefault();
-    useBoost();
-  }
 });
 
 canvas.addEventListener("pointerdown", (event) => {

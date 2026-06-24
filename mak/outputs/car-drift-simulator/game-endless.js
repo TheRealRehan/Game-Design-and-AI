@@ -1201,7 +1201,7 @@ function update(dt) {
     state.pickupTimer = d.pickupEvery + Math.random() * 1.25;
   }
 
-  const playerBox = { x: p.x, y: p.y, width: 82, height: 122 };
+  const playerBox = { x: p.x, y: p.y, width: 82, height: 122, lane: p.lane };
   for (const entity of state.entities) {
     if (collide(playerBox, entity)) {
       if (entity.kind === "pickup") collectPickup(entity);
@@ -2204,7 +2204,7 @@ function update(dt) {
     state.pickupTimer = d.pickupEvery + Math.random() * 1.25;
   }
 
-  const playerBox = { x: p.x, y: p.y, width: 82, height: 122 };
+  const playerBox = { x: p.x, y: p.y, width: 82, height: 122, lane: p.lane };
   for (const entity of state.entities) {
     if (collide(playerBox, entity)) {
       if (entity.kind === "pickup") collectPickup(entity);
@@ -2684,9 +2684,9 @@ function updateDuo(dt) {
 
   for (const player of state.duo.players) {
     if (!player.alive) continue;
-    const playerBox = { x: player.x, y: player.y, width: 82, height: 122 };
+    const playerBox = { x: player.x, y: player.y, width: 82, height: 122, lane: player.lane };
     for (const entity of state.duo.entities) {
-      if (entity.road !== player.index || entity.hit) continue;
+      if (entity.road !== player.index || entity.hit || entity.lane !== player.lane) continue;
       if (Math.abs(playerBox.x - entity.x) < (playerBox.width + entity.width) * 0.5 && Math.abs(playerBox.y - entity.y) < (playerBox.height + entity.height) * 0.5) {
         if (entity.kind === "pickup") duoCollectPickup(player, entity);
         else duoHitObstacle(player, entity);
@@ -3122,7 +3122,7 @@ function update(dt) {
     spawnPickup();
     state.pickupTimer = d.pickupEvery + Math.random() * 1.25;
   }
-  const playerBox = { x: p.x, y: p.y, width: 82, height: 122 };
+  const playerBox = { x: p.x, y: p.y, width: 82, height: 122, lane: p.lane };
   for (const entity of state.entities) {
     if (entity.road === undefined && typeof entity.lane === "number" && lanes[entity.lane] !== undefined) entity.x = lanes[entity.lane];
     if (collide(playerBox, entity)) {
@@ -3201,6 +3201,336 @@ function resetRun(mode) {
 }
 
 state.buildVersion = "premium-rehan-gold-v14";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+/* v15: wider Lane Surge spacing and lane-aware collisions. */
+function setLaneCount(count) {
+  const safeCount = Math.max(3, Math.min(7, count));
+  if (lanes.length === safeCount) return;
+  const span = safeCount <= 3 ? 420 : Math.min(760, canvas.width - 160);
+  const spacing = span / (safeCount - 1);
+  lanes.length = 0;
+  for (let i = 0; i < safeCount; i++) lanes.push((i - (safeCount - 1) / 2) * spacing);
+  state.player.lane = Math.max(0, Math.min(safeCount - 1, state.player.lane));
+  state.player.targetX = lanes[state.player.lane];
+}
+
+function collide(a, b) {
+  if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
+  const bx = entityLaneX(b);
+  return Math.abs(a.x - bx) < (a.width + b.width) * 0.5 &&
+    Math.abs(a.y - b.y) < (a.height + b.height) * 0.5;
+}
+
+state.buildVersion = "premium-rehan-gold-v15";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+/* v16: Lane Surge compact obstacle visuals and strict same-lane obstacle hits. */
+function isLaneSurgeActive() {
+  return !!modes[state.selectedMode]?.laneGrowth;
+}
+
+function collide(a, b) {
+  if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
+  if (isLaneSurgeActive() && b?.kind === "obstacle") {
+    return Math.abs(a.y - b.y) < (a.height + b.height) * 0.38;
+  }
+  const bx = entityLaneX(b);
+  return Math.abs(a.x - bx) < (a.width + b.width) * 0.5 &&
+    Math.abs(a.y - b.y) < (a.height + b.height) * 0.5;
+}
+
+function drawObstacle(o) {
+  const laneX = o && o.road === undefined && typeof o.lane === "number" && lanes[o.lane] !== undefined ? lanes[o.lane] : o.x;
+  o.x = laneX;
+  const compact = isLaneSurgeActive() && o.road === undefined;
+  ctx.save();
+  ctx.translate(roadX(laneX), o.y);
+  if (compact) ctx.scale(0.58, 0.82);
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(0, 14, o.width * 0.48, o.height * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  if (o.id === "cone") {
+    ctx.fillStyle = "#ff8a34"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(28, 30); ctx.lineTo(-28, 30); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-22, 12, 44, 8);
+  } else if (o.id === "barrier") {
+    ctx.fillStyle = "#f24f5f"; roundedRect(-58, -23, 116, 46, 8); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-44, -7, 88, 12);
+  } else if (o.id === "parked") {
+    ctx.fillStyle = "#6cd0ff"; roundedRect(-50, -74, 100, 148, 15); ctx.fill();
+    ctx.fillStyle = "#10202d"; roundedRect(-31, -44, 62, 36, 8); ctx.fill(); roundedRect(-29, 16, 58, 34, 8); ctx.fill();
+    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-36, -76, 18, 8); ctx.fillRect(18, -76, 18, 8);
+  } else if (o.id === "oil") {
+    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 64, 32, -0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-18, -8, 22, 9, -0.4, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillStyle = "#f7f7f2"; roundedRect(-72, -27, 144, 54, 8); ctx.fill();
+    ctx.fillStyle = "#ff4f64"; for (let x = -58; x < 60; x += 36) ctx.fillRect(x, -24, 18, 48);
+  }
+  ctx.restore();
+}
+
+state.buildVersion = "premium-rehan-gold-v16";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* v17: Lane Surge uses three equal wide lanes with compact car and obstacles. */
+function currentLaneCount() {
+  return 3;
+}
+
+function setLaneCount(count) {
+  const safeCount = 3;
+  const span = 540;
+  const spacing = span / (safeCount - 1);
+  lanes.length = 0;
+  for (let i = 0; i < safeCount; i++) lanes.push((i - 1) * spacing);
+  state.player.lane = Math.max(0, Math.min(safeCount - 1, state.player.lane));
+  state.player.targetX = lanes[state.player.lane];
+}
+
+const drawCarBeforeV17 = drawCar;
+function drawCompactLaneCar(x, y, body) {
+  const jackpot = state.player.goldJackpot || body === "gold";
+  ctx.save();
+  ctx.translate(roadX(x), y);
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath(); ctx.ellipse(0, 27, 40, 17, 0, 0, Math.PI * 2); ctx.fill();
+  const paint = ctx.createLinearGradient(-32, -56, 32, 56);
+  if (jackpot) {
+    paint.addColorStop(0, "#fff8bf"); paint.addColorStop(0.45, "#ffd447"); paint.addColorStop(1, "#9b6a00");
+  } else {
+    paint.addColorStop(0, "#ffffff"); paint.addColorStop(0.12, body); paint.addColorStop(1, "#14202b");
+  }
+  ctx.fillStyle = paint;
+  roundedRect(-30, -56, 60, 112, 13); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.36)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#06121c";
+  roundedRect(-21, -37, 42, 28, 8); ctx.fill();
+  roundedRect(-20, 12, 40, 27, 8); ctx.fill();
+  ctx.fillStyle = "#ffe58b"; ctx.fillRect(-23, -60, 14, 7); ctx.fillRect(9, -60, 14, 7);
+  ctx.fillStyle = "#ff5d58"; ctx.fillRect(-23, 53, 14, 6); ctx.fillRect(9, 53, 14, 6);
+  ctx.fillStyle = "#05080c";
+  roundedRect(-39, -42, 13, 20, 5); ctx.fill(); roundedRect(26, -42, 13, 20, 5); ctx.fill();
+  roundedRect(-39, 27, 13, 20, 5); ctx.fill(); roundedRect(26, 27, 13, 20, 5); ctx.fill();
+  ctx.restore();
+}
+
+function drawCar(x, y, body, trim = "#111318") {
+  if (isLaneSurgeActive() && !state.duo?.active) {
+    drawCompactLaneCar(x, y, body);
+    return;
+  }
+  drawCarBeforeV17(x, y, body, trim);
+}
+
+function drawObstacle(o) {
+  const laneX = o && o.road === undefined && typeof o.lane === "number" && lanes[o.lane] !== undefined ? lanes[o.lane] : o.x;
+  o.x = laneX;
+  const compact = isLaneSurgeActive() && o.road === undefined;
+  ctx.save();
+  ctx.translate(roadX(laneX), o.y);
+  if (compact) ctx.scale(0.46, 0.72);
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(0, 14, o.width * 0.48, o.height * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  if (o.id === "cone") {
+    ctx.fillStyle = "#ff8a34"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(28, 30); ctx.lineTo(-28, 30); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-22, 12, 44, 8);
+  } else if (o.id === "barrier") {
+    ctx.fillStyle = "#f24f5f"; roundedRect(-58, -23, 116, 46, 8); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-44, -7, 88, 12);
+  } else if (o.id === "parked") {
+    ctx.fillStyle = "#6cd0ff"; roundedRect(-50, -74, 100, 148, 15); ctx.fill();
+    ctx.fillStyle = "#10202d"; roundedRect(-31, -44, 62, 36, 8); ctx.fill(); roundedRect(-29, 16, 58, 34, 8); ctx.fill();
+    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-36, -76, 18, 8); ctx.fillRect(18, -76, 18, 8);
+  } else if (o.id === "oil") {
+    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 64, 32, -0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-18, -8, 22, 9, -0.4, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillStyle = "#f7f7f2"; roundedRect(-72, -27, 144, 54, 8); ctx.fill();
+    ctx.fillStyle = "#ff4f64"; for (let x = -58; x < 60; x += 36) ctx.fillRect(x, -24, 18, 48);
+  }
+  ctx.restore();
+}
+
+function collide(a, b) {
+  if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
+  if (isLaneSurgeActive() && b?.kind === "obstacle") {
+    return Math.abs(a.y - b.y) < (a.height + b.height) * 0.34;
+  }
+  const bx = entityLaneX(b);
+  return Math.abs(a.x - bx) < (a.width + b.width) * 0.5 &&
+    Math.abs(a.y - b.y) < (a.height + b.height) * 0.5;
+}
+
+const menuHtmlBeforeV17 = menuHtml;
+function menuHtml() {
+  return menuHtmlBeforeV17()
+    .replace('Lane Surge <small>New lanes every 1000 m</small>', 'Lane Surge <small>3 wide equal lanes</small>');
+}
+
+state.buildVersion = "premium-rehan-gold-v17";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* v18: direct menu and car renderers, no wrappers. */
+function menuHtml() {
+  const profile = getProfile(state.username || "Driver");
+  const ownedPfps = pfps.filter((item) => profile.ownedPfps.includes(item.id));
+  const boardHtml = ["easy", "medium", "hard", "laneSurge", "duoDash"].map(leaderboardCardHtml).join("");
+  return `
+    <section class="hero-menu cinematic-menu">
+      <div class="hero-copy">
+        <p class="eyebrow">Endless arcade driving</p>
+        <h1 class="animated-title">Bolt Heist</h1>
+        <p class="subtitle">Dodge traffic, grab road cash, unlock wild cosmetics, and survive the wildest getaway modes.</p>
+      </div>
+      <div class="profile-badge premium-profile">
+        ${pfpHtml(profile.equippedPfp, "large")}
+        <span>${profile.name}</span>
+        <strong>$${profile.wallet}</strong>
+      </div>
+      <div class="menu-road-art" aria-hidden="true"><span></span><span></span><span></span></div>
+    </section>
+    <label class="name-field premium-name">
+      <span>Driver name</span>
+      <input id="driverName" maxlength="16" placeholder="Your name" value="${state.username}">
+    </label>
+    <div class="pfp-picker emoji-picker">${ownedPfps.map((item) => `<button data-equip-pfp="${item.id}" type="button" class="pfp-choice ${profile.equippedPfp === item.id ? "selected" : ""}">${pfpHtml(item.id)}<span>${item.name}</span></button>`).join("")}</div>
+    ${profileKey(profile.name) === "rehan" ? `<p class="rehan-banner">Rehan mode unlocked: every skin, pfp, and upgrade is yours.</p>` : ""}
+    <h2>Choose Mode</h2>
+    <div class="mode-grid premium-modes five-modes">
+      <button data-start="easy" type="button">Easy <small>5 lives</small></button>
+      <button data-start="medium" type="button">Medium <small>3 lives</small></button>
+      <button data-start="hard" type="button">Hard <small>1 life</small></button>
+      <button data-start="laneSurge" type="button">Lane Surge <small>3 wide equal lanes</small></button>
+      <button data-start="duoDash" type="button">Split Heist <small>Left WASD, right arrow keys</small></button>
+    </div>
+    <div class="menu-actions big-actions">
+      <button data-view="shop" type="button">Shop</button>
+      <button data-view="info" type="button">Information</button>
+    </div>
+    <h2>Leaderboards</h2>
+    <div class="leaderboards aesthetic-leaderboards five-boards">${boardHtml}</div>
+  `;
+}
+
+function drawCar(x, y, body, trim = "#111318") {
+  const compact = isLaneSurgeActive() && !state.duo?.active;
+  const scale = compact ? 0.72 : 1;
+  const jackpot = state.player.goldJackpot || body === "gold";
+  ctx.save();
+  ctx.translate(roadX(x), y);
+  ctx.scale(scale, scale);
+  const speedFactor = Math.min(1, (state.player?.speed || 90) / 128);
+  const wheelSpin = state.roadOffset * 0.18 + performance.now() * 0.008 * speedFactor;
+  const bob = Math.sin(performance.now() * 0.018) * 2.2 * speedFactor;
+  ctx.translate(0, bob);
+  ctx.fillStyle = "rgba(0,0,0,0.34)";
+  ctx.beginPath(); ctx.ellipse(0, 30, 56, 23, 0, 0, Math.PI * 2); ctx.fill();
+  function wheel(wx, wy) {
+    ctx.save(); ctx.translate(wx, wy); ctx.rotate(wheelSpin); ctx.fillStyle = "#05080c"; roundedRect(-9, -15, 18, 30, 5); ctx.fill(); ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.moveTo(0, -9); ctx.lineTo(0, 9); ctx.stroke(); ctx.restore();
+  }
+  wheel(-43, -47); wheel(43, -47); wheel(-43, 43); wheel(43, 43);
+  const paint = ctx.createLinearGradient(-42, -70, 42, 70);
+  if (jackpot) { paint.addColorStop(0, "#fff8bf"); paint.addColorStop(0.45, "#ffd447"); paint.addColorStop(1, "#9b6a00"); }
+  else { paint.addColorStop(0, "#ffffff"); paint.addColorStop(0.1, body); paint.addColorStop(0.78, body); paint.addColorStop(1, "#14202b"); }
+  ctx.fillStyle = paint; roundedRect(-38, -68, 76, 136, 16); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.36)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = jackpot ? "rgba(50,30,0,0.72)" : "rgba(7,17,26,0.82)";
+  roundedRect(-27, -47, 54, 36, 10); ctx.fill(); roundedRect(-25, 15, 50, 34, 10); ctx.fill();
+  ctx.fillStyle = jackpot ? "#fff8bf" : "#ffe58b"; ctx.fillRect(-29, -72, 16, 8); ctx.fillRect(13, -72, 16, 8);
+  ctx.fillStyle = jackpot ? "#ffef8a" : "#ff5d58"; ctx.fillRect(-29, 65, 16, 7); ctx.fillRect(13, 65, 16, 7);
+  ctx.restore();
+}
+
+state.buildVersion = "premium-rehan-gold-v18";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* v19: extra-compact Lane Surge car, obstacles, and hitboxes. */
+function laneModeCompactScale() {
+  return isLaneSurgeActive() && !state.duo?.active;
+}
+
+function collide(a, b) {
+  if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
+  const bx = entityLaneX(b);
+  const playerWidth = laneModeCompactScale() ? 28 : Math.min(a.width || 82, 58);
+  const playerHeight = laneModeCompactScale() ? 74 : Math.min(a.height || 122, 96);
+  const objectWidth = laneModeCompactScale() ? 28 : Math.min(b.width || 80, b.kind === "obstacle" ? 54 : 62);
+  const objectHeight = laneModeCompactScale() ? Math.min(b.height || 70, 58) : Math.min(b.height || 90, 82);
+  return Math.abs(a.x - bx) < (playerWidth + objectWidth) * 0.5 &&
+    Math.abs(a.y - b.y) < (playerHeight + objectHeight) * 0.5;
+}
+
+function drawCar(x, y, body, trim = "#111318") {
+  const scale = laneModeCompactScale() ? 0.52 : 0.86;
+  const jackpot = state.player.goldJackpot || body === "gold";
+  ctx.save();
+  ctx.translate(roadX(x), y);
+  ctx.scale(scale, scale);
+  const speedFactor = Math.min(1, (state.player?.speed || 90) / 128);
+  const wheelSpin = state.roadOffset * 0.18 + performance.now() * 0.008 * speedFactor;
+  const bob = Math.sin(performance.now() * 0.018) * 2.2 * speedFactor;
+  ctx.translate(0, bob);
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath(); ctx.ellipse(0, 30, 50, 20, 0, 0, Math.PI * 2); ctx.fill();
+  function wheel(wx, wy) {
+    ctx.save(); ctx.translate(wx, wy); ctx.rotate(wheelSpin); ctx.fillStyle = "#05080c"; roundedRect(-8, -14, 16, 28, 5); ctx.fill(); ctx.strokeStyle = "#7b8494"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -8); ctx.lineTo(0, 8); ctx.stroke(); ctx.restore();
+  }
+  wheel(-39, -45); wheel(39, -45); wheel(-39, 41); wheel(39, 41);
+  const paint = ctx.createLinearGradient(-36, -66, 36, 66);
+  if (jackpot) { paint.addColorStop(0, "#fff8bf"); paint.addColorStop(0.45, "#ffd447"); paint.addColorStop(1, "#9b6a00"); }
+  else { paint.addColorStop(0, "#ffffff"); paint.addColorStop(0.12, body); paint.addColorStop(0.8, body); paint.addColorStop(1, "#14202b"); }
+  ctx.fillStyle = paint; roundedRect(-33, -64, 66, 128, 15); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.36)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = jackpot ? "rgba(50,30,0,0.72)" : "rgba(7,17,26,0.82)";
+  roundedRect(-23, -43, 46, 32, 9); ctx.fill(); roundedRect(-22, 14, 44, 31, 9); ctx.fill();
+  ctx.fillStyle = jackpot ? "#fff8bf" : "#ffe58b"; ctx.fillRect(-25, -68, 14, 7); ctx.fillRect(11, -68, 14, 7);
+  ctx.fillStyle = jackpot ? "#ffef8a" : "#ff5d58"; ctx.fillRect(-25, 61, 14, 6); ctx.fillRect(11, 61, 14, 6);
+  ctx.restore();
+}
+
+function drawObstacle(o) {
+  const laneX = o && o.road === undefined && typeof o.lane === "number" && lanes[o.lane] !== undefined ? lanes[o.lane] : o.x;
+  o.x = laneX;
+  const compact = laneModeCompactScale() && o.road === undefined;
+  ctx.save();
+  ctx.translate(roadX(laneX), o.y);
+  ctx.scale(compact ? 0.34 : 0.68, compact ? 0.58 : 0.78);
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath(); ctx.ellipse(0, 14, o.width * 0.48, o.height * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  if (o.id === "cone") {
+    ctx.fillStyle = "#ff8a34"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(28, 30); ctx.lineTo(-28, 30); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-22, 12, 44, 8);
+  } else if (o.id === "barrier") {
+    ctx.fillStyle = "#f24f5f"; roundedRect(-58, -23, 116, 46, 8); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-44, -7, 88, 12);
+  } else if (o.id === "parked") {
+    ctx.fillStyle = "#6cd0ff"; roundedRect(-50, -74, 100, 148, 15); ctx.fill();
+    ctx.fillStyle = "#10202d"; roundedRect(-31, -44, 62, 36, 8); ctx.fill(); roundedRect(-29, 16, 58, 34, 8); ctx.fill();
+    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-36, -76, 18, 8); ctx.fillRect(18, -76, 18, 8);
+  } else if (o.id === "oil") {
+    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 64, 32, -0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-18, -8, 22, 9, -0.4, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillStyle = "#f7f7f2"; roundedRect(-72, -27, 144, 54, 8); ctx.fill();
+    ctx.fillStyle = "#ff4f64"; for (let x = -58; x < 60; x += 36) ctx.fillRect(x, -24, 18, 48);
+  }
+  ctx.restore();
+}
+
+state.buildVersion = "premium-rehan-gold-v19";
 if (["menu", "info", "shop"].includes(state.mode)) {
   showMenu();
   updateHud();

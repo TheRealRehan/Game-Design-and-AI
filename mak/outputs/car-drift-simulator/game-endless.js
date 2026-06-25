@@ -4418,3 +4418,179 @@ if (["menu", "info", "shop"].includes(state.mode)) {
   showMenu();
   updateHud();
 }
+
+/* premium-rehan-gold-v29: remove golden infinite powerup and hard-match ability rates. */
+for (const modeId of ["easy", "medium", "hard"]) {
+  if (modes[modeId]) {
+    modes[modeId].pickupDelay = modes.hard.pickupDelay;
+    modes[modeId].abilityBias = modes.hard.abilityBias;
+  }
+}
+
+function leaderboardModesForMenu() {
+  return ["easy", "medium", "hard"];
+}
+
+function menuHtml() {
+  const profile = getProfile(state.username || "Driver");
+  const ownedPfps = pfps.filter((item) => profile.ownedPfps.includes(item.id));
+  const adminUnlocked = cleanName(profile.name).toLowerCase() === "rehanadmin";
+  const boardHtml = leaderboardModesForMenu().map(leaderboardCardHtml).join("");
+  const testButton = adminUnlocked
+    ? `<button data-start="testmode" type="button" class="testmode-button">testmode <small>Admin: Extra Life lab</small></button>`
+    : "";
+  return `
+    <section class="hero-menu cinematic-menu">
+      <div class="hero-copy">
+        <p class="eyebrow">Endless arcade driving</p>
+        <h1 class="animated-title">Bolt Heist</h1>
+        <p class="subtitle">Dodge traffic, grab road cash, unlock wild cosmetics, and survive the wildest getaway modes.</p>
+      </div>
+      <div class="profile-badge premium-profile">
+        ${pfpHtml(profile.equippedPfp, "large")}
+        <span>${profile.name}</span>
+        <strong>$${profile.wallet}</strong>
+      </div>
+      <div class="menu-road-art" aria-hidden="true"><span></span><span></span><span></span></div>
+    </section>
+    <label class="name-field premium-name">
+      <span>Driver name</span>
+      <input id="driverName" maxlength="16" placeholder="Your name" value="${state.username}">
+    </label>
+    <div class="pfp-picker emoji-picker">${ownedPfps.map((item) => `<button data-equip-pfp="${item.id}" type="button" class="pfp-choice ${profile.equippedPfp === item.id ? "selected" : ""}">${pfpHtml(item.id)}<span>${item.name}</span></button>`).join("")}</div>
+    ${profileKey(profile.name) === "rehan" ? `<p class="rehan-banner">Rehan mode unlocked: every skin, pfp, and upgrade is yours.</p>` : ""}
+    ${adminUnlocked ? `<p class="rehan-banner admin-banner">Admin testing unlocked: testmode now spawns Extra Life again.</p>` : ""}
+    <h2>Choose Mode</h2>
+    <div class="mode-grid premium-modes ${adminUnlocked ? "five-modes" : "four-modes"}">
+      <button data-start="easy" type="button">Easy <small>5 lives, hard-rate powerups</small></button>
+      <button data-start="medium" type="button">Medium <small>3 lives, hard-rate powerups</small></button>
+      <button data-start="hard" type="button">Hard <small>1 life</small></button>
+      <button data-start="duoDash" type="button">Split Heist <small>Versus: last driver wins</small></button>
+      ${testButton}
+    </div>
+    <div class="menu-actions big-actions">
+      <button data-view="shop" type="button">Shop</button>
+      <button data-view="info" type="button">Information</button>
+    </div>
+    <h2>Leaderboards</h2>
+    <div class="leaderboards aesthetic-leaderboards">${boardHtml}</div>
+  `;
+}
+
+function weightedPickupType() {
+  if (modes[state.selectedMode]?.testMode) {
+    return pickupTypes.find((pickup) => pickup.id === "life") || pickupTypes.find((pickup) => pickup.id === "cash");
+  }
+  const mode = modes[state.selectedMode] || modes.medium;
+  const heatPressure = Math.max(0.2, 1 - (state.heat - 1) * 0.06);
+  const abilityWeight = modes.hard.abilityBias * heatPressure;
+  const weights = [
+    ["life", 1.05 * abilityWeight],
+    ["autopilot", 0.82 * abilityWeight],
+    ["immortal", 0.62 * abilityWeight],
+    ["cash", 1.1 + state.heat * 0.16 + (1 - modes.hard.abilityBias) * 2.4],
+  ];
+  if (pickupTypes.some((pickup) => pickup.id === "cash-multiplier")) weights.push(["cash-multiplier", 0.42 * abilityWeight]);
+  let total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (const [id, weight] of weights) {
+    roll -= weight;
+    if (roll <= 0) return pickupTypes.find((pickup) => pickup.id === id);
+  }
+  return pickupTypes.find((pickup) => pickup.id === "cash");
+}
+
+function difficulty() {
+  const mode = modes[state.selectedMode] || modes.medium;
+  const heat = state.heat;
+  const turbo = ownsUpgrade("turbo-tune") ? 9 : 0;
+  const grip = ownsUpgrade("street-grip") ? 1.8 : 0;
+  const radar = ownsUpgrade("pickup-radar") ? -0.45 : 0;
+  if (mode.testMode) {
+    return {
+      topSpeed: 108 + turbo,
+      accel: 18,
+      handling: 9.7 + grip,
+      spawnEvery: 1.55,
+      pickupEvery: 0.9,
+      obstacleSpeed: 355 + heat * 14,
+    };
+  }
+  return {
+    topSpeed: 116 + turbo,
+    accel: 18,
+    handling: 8.9 + grip,
+    spawnEvery: Math.max(0.5, 1.18 + mode.spawnOffset - heat * 0.04),
+    pickupEvery: Math.max(1.75, 3.8 + modes.hard.pickupDelay + radar - heat * 0.05),
+    obstacleSpeed: 385 + heat * 27,
+  };
+}
+
+function collectPickup(entity) {
+  const p = state.player;
+  entity.hit = true;
+  if (entity.id === "life") {
+    applyExtraLifeToRun();
+  } else if (entity.id === "autopilot") {
+    p.autopilot = ownsUpgrade("auto-chip") ? 7.5 : 5;
+    p.recoveryShield = 0;
+    setMessage(`Autopilot active for ${Math.round(p.autopilot)} seconds.`);
+  } else if (entity.id === "immortal") {
+    p.immortal = 5;
+    p.recoveryShield = 0;
+    setMessage("Immortality active for 5 seconds.");
+  } else if (entity.id === "cash-multiplier") {
+    state.cashMultiplier = 2;
+    state.cashMultiplierTimer = 8;
+    setMessage("Cash multiplier active. Cash grabs are doubled.");
+  } else {
+    const base = 25 + state.heat * 8;
+    const magnet = ownsUpgrade("cash-magnet") ? 1.5 : 1;
+    const value = Math.round(base * magnet * (state.cashMultiplier || 1));
+    state.cash += value;
+    setMessage(`Grabbed $${value}.`);
+  }
+}
+
+function duoCollectPickup(player, entity) {
+  entity.hit = true;
+  if (entity.id === "life") {
+    applyExtraLifeToDuoPlayer(player);
+  } else if (entity.id === "autopilot") {
+    player.autopilot = ownsUpgrade("auto-chip") ? 7.5 : 5;
+    player.recoveryShield = 0;
+    duoSetMessage(`${player.label} got autopilot.`);
+  } else if (entity.id === "immortal") {
+    player.immortal = 5;
+    player.recoveryShield = 0;
+    duoSetMessage(`${player.label} is immortal.`);
+  } else if (entity.id === "cash-multiplier") {
+    state.cashMultiplier = 2;
+    state.cashMultiplierTimer = 8;
+    duoSetMessage(`${player.label} doubled cash grabs.`);
+  } else {
+    const base = 25 + state.heat * 8;
+    const magnet = ownsUpgrade("cash-magnet") ? 1.5 : 1;
+    const value = Math.round(base * magnet * (state.cashMultiplier || 1));
+    state.cash += value;
+    duoSetMessage(`${player.label} grabbed $${value}.`);
+  }
+}
+
+state.buildVersion = "premium-rehan-gold-v29";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v30: fully remove the golden infinite powerup from active pickups. */
+for (let i = pickupTypes.length - 1; i >= 0; i -= 1) {
+  if (pickupTypes[i].id === "gold-jackpot") pickupTypes.splice(i, 1);
+}
+if (state.entities) state.entities = state.entities.filter((entity) => entity.id !== "gold-jackpot");
+if (state.duo?.entities) state.duo.entities = state.duo.entities.filter((entity) => entity.id !== "gold-jackpot");
+state.buildVersion = "premium-rehan-gold-v30";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}

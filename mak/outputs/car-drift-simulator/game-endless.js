@@ -1201,7 +1201,7 @@ function update(dt) {
     state.pickupTimer = d.pickupEvery + Math.random() * 1.25;
   }
 
-  const playerBox = { x: p.x, y: p.y, width: 82, height: 122, lane: p.lane };
+  const playerBox = { x: p.x, y: p.y, width: 82, height: 122 };
   for (const entity of state.entities) {
     if (collide(playerBox, entity)) {
       if (entity.kind === "pickup") collectPickup(entity);
@@ -2204,7 +2204,7 @@ function update(dt) {
     state.pickupTimer = d.pickupEvery + Math.random() * 1.25;
   }
 
-  const playerBox = { x: p.x, y: p.y, width: 82, height: 122, lane: p.lane };
+  const playerBox = { x: p.x, y: p.y, width: 82, height: 122 };
   for (const entity of state.entities) {
     if (collide(playerBox, entity)) {
       if (entity.kind === "pickup") collectPickup(entity);
@@ -2684,9 +2684,9 @@ function updateDuo(dt) {
 
   for (const player of state.duo.players) {
     if (!player.alive) continue;
-    const playerBox = { x: player.x, y: player.y, width: 82, height: 122, lane: player.lane };
+    const playerBox = { x: player.x, y: player.y, width: 82, height: 122 };
     for (const entity of state.duo.entities) {
-      if (entity.road !== player.index || entity.hit || entity.lane !== player.lane) continue;
+      if (entity.road !== player.index || entity.hit) continue;
       if (Math.abs(playerBox.x - entity.x) < (playerBox.width + entity.width) * 0.5 && Math.abs(playerBox.y - entity.y) < (playerBox.height + entity.height) * 0.5) {
         if (entity.kind === "pickup") duoCollectPickup(player, entity);
         else duoHitObstacle(player, entity);
@@ -3122,7 +3122,7 @@ function update(dt) {
     spawnPickup();
     state.pickupTimer = d.pickupEvery + Math.random() * 1.25;
   }
-  const playerBox = { x: p.x, y: p.y, width: 82, height: 122, lane: p.lane };
+  const playerBox = { x: p.x, y: p.y, width: 82, height: 122 };
   for (const entity of state.entities) {
     if (entity.road === undefined && typeof entity.lane === "number" && lanes[entity.lane] !== undefined) entity.x = lanes[entity.lane];
     if (collide(playerBox, entity)) {
@@ -3205,81 +3205,7 @@ if (["menu", "info", "shop"].includes(state.mode)) {
   showMenu();
   updateHud();
 }
-/* v15: wider Lane Surge spacing and lane-aware collisions. */
-function setLaneCount(count) {
-  const safeCount = Math.max(3, Math.min(7, count));
-  if (lanes.length === safeCount) return;
-  const span = safeCount <= 3 ? 420 : Math.min(760, canvas.width - 160);
-  const spacing = span / (safeCount - 1);
-  lanes.length = 0;
-  for (let i = 0; i < safeCount; i++) lanes.push((i - (safeCount - 1) / 2) * spacing);
-  state.player.lane = Math.max(0, Math.min(safeCount - 1, state.player.lane));
-  state.player.targetX = lanes[state.player.lane];
-}
-
-function collide(a, b) {
-  if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
-  const bx = entityLaneX(b);
-  return Math.abs(a.x - bx) < (a.width + b.width) * 0.5 &&
-    Math.abs(a.y - b.y) < (a.height + b.height) * 0.5;
-}
-
-state.buildVersion = "premium-rehan-gold-v15";
-if (["menu", "info", "shop"].includes(state.mode)) {
-  showMenu();
-  updateHud();
-}
-/* v16: Lane Surge compact obstacle visuals and strict same-lane obstacle hits. */
-function isLaneSurgeActive() {
-  return !!modes[state.selectedMode]?.laneGrowth;
-}
-
-function collide(a, b) {
-  if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
-  if (isLaneSurgeActive() && b?.kind === "obstacle") {
-    return Math.abs(a.y - b.y) < (a.height + b.height) * 0.38;
-  }
-  const bx = entityLaneX(b);
-  return Math.abs(a.x - bx) < (a.width + b.width) * 0.5 &&
-    Math.abs(a.y - b.y) < (a.height + b.height) * 0.5;
-}
-
-function drawObstacle(o) {
-  const laneX = o && o.road === undefined && typeof o.lane === "number" && lanes[o.lane] !== undefined ? lanes[o.lane] : o.x;
-  o.x = laneX;
-  const compact = isLaneSurgeActive() && o.road === undefined;
-  ctx.save();
-  ctx.translate(roadX(laneX), o.y);
-  if (compact) ctx.scale(0.58, 0.82);
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath(); ctx.ellipse(0, 14, o.width * 0.48, o.height * 0.2, 0, 0, Math.PI * 2); ctx.fill();
-  if (o.id === "cone") {
-    ctx.fillStyle = "#ff8a34"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(28, 30); ctx.lineTo(-28, 30); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-22, 12, 44, 8);
-  } else if (o.id === "barrier") {
-    ctx.fillStyle = "#f24f5f"; roundedRect(-58, -23, 116, 46, 8); ctx.fill();
-    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-44, -7, 88, 12);
-  } else if (o.id === "parked") {
-    ctx.fillStyle = "#6cd0ff"; roundedRect(-50, -74, 100, 148, 15); ctx.fill();
-    ctx.fillStyle = "#10202d"; roundedRect(-31, -44, 62, 36, 8); ctx.fill(); roundedRect(-29, 16, 58, 34, 8); ctx.fill();
-    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-36, -76, 18, 8); ctx.fillRect(18, -76, 18, 8);
-  } else if (o.id === "oil") {
-    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 64, 32, -0.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-18, -8, 22, 9, -0.4, 0, Math.PI * 2); ctx.fill();
-  } else {
-    ctx.fillStyle = "#f7f7f2"; roundedRect(-72, -27, 144, 54, 8); ctx.fill();
-    ctx.fillStyle = "#ff4f64"; for (let x = -58; x < 60; x += 36) ctx.fillRect(x, -24, 18, 48);
-  }
-  ctx.restore();
-}
-
-state.buildVersion = "premium-rehan-gold-v16";
-if (["menu", "info", "shop"].includes(state.mode)) {
-  showMenu();
-  updateHud();
-}
-
-/* v17: Lane Surge uses three equal wide lanes with compact car and obstacles. */
+/* premium-rehan-gold-v20: extra-life heal fix plus lane-safe hitboxes */
 function currentLaneCount() {
   return 3;
 }
@@ -3294,97 +3220,144 @@ function setLaneCount(count) {
   state.player.targetX = lanes[state.player.lane];
 }
 
-const drawCarBeforeV17 = drawCar;
-function drawCompactLaneCar(x, y, body) {
-  const jackpot = state.player.goldJackpot || body === "gold";
-  ctx.save();
-  ctx.translate(roadX(x), y);
-  ctx.fillStyle = "rgba(0,0,0,0.32)";
-  ctx.beginPath(); ctx.ellipse(0, 27, 40, 17, 0, 0, Math.PI * 2); ctx.fill();
-  const paint = ctx.createLinearGradient(-32, -56, 32, 56);
-  if (jackpot) {
-    paint.addColorStop(0, "#fff8bf"); paint.addColorStop(0.45, "#ffd447"); paint.addColorStop(1, "#9b6a00");
-  } else {
-    paint.addColorStop(0, "#ffffff"); paint.addColorStop(0.12, body); paint.addColorStop(1, "#14202b");
-  }
-  ctx.fillStyle = paint;
-  roundedRect(-30, -56, 60, 112, 13); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.36)"; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = "#06121c";
-  roundedRect(-21, -37, 42, 28, 8); ctx.fill();
-  roundedRect(-20, 12, 40, 27, 8); ctx.fill();
-  ctx.fillStyle = "#ffe58b"; ctx.fillRect(-23, -60, 14, 7); ctx.fillRect(9, -60, 14, 7);
-  ctx.fillStyle = "#ff5d58"; ctx.fillRect(-23, 53, 14, 6); ctx.fillRect(9, 53, 14, 6);
-  ctx.fillStyle = "#05080c";
-  roundedRect(-39, -42, 13, 20, 5); ctx.fill(); roundedRect(26, -42, 13, 20, 5); ctx.fill();
-  roundedRect(-39, 27, 13, 20, 5); ctx.fill(); roundedRect(26, 27, 13, 20, 5); ctx.fill();
-  ctx.restore();
+function laneModeCompactScale() {
+  return !!modes[state.selectedMode]?.laneGrowth && !state.duo?.active;
 }
 
-function drawCar(x, y, body, trim = "#111318") {
-  if (isLaneSurgeActive() && !state.duo?.active) {
-    drawCompactLaneCar(x, y, body);
-    return;
+function applyExtraLifeToRun() {
+  if (state.lives < state.maxLives) {
+    state.lives = Math.min(state.maxLives, state.lives + 1);
+  } else {
+    state.maxLives += 1;
+    state.lives += 1;
   }
-  drawCarBeforeV17(x, y, body, trim);
+  setMessage(`Extra life collected. ${state.lives}/${state.maxLives} lives.`);
 }
 
-function drawObstacle(o) {
-  const laneX = o && o.road === undefined && typeof o.lane === "number" && lanes[o.lane] !== undefined ? lanes[o.lane] : o.x;
-  o.x = laneX;
-  const compact = isLaneSurgeActive() && o.road === undefined;
-  ctx.save();
-  ctx.translate(roadX(laneX), o.y);
-  if (compact) ctx.scale(0.46, 0.72);
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath(); ctx.ellipse(0, 14, o.width * 0.48, o.height * 0.2, 0, 0, Math.PI * 2); ctx.fill();
-  if (o.id === "cone") {
-    ctx.fillStyle = "#ff8a34"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(28, 30); ctx.lineTo(-28, 30); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-22, 12, 44, 8);
-  } else if (o.id === "barrier") {
-    ctx.fillStyle = "#f24f5f"; roundedRect(-58, -23, 116, 46, 8); ctx.fill();
-    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-44, -7, 88, 12);
-  } else if (o.id === "parked") {
-    ctx.fillStyle = "#6cd0ff"; roundedRect(-50, -74, 100, 148, 15); ctx.fill();
-    ctx.fillStyle = "#10202d"; roundedRect(-31, -44, 62, 36, 8); ctx.fill(); roundedRect(-29, 16, 58, 34, 8); ctx.fill();
-    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-36, -76, 18, 8); ctx.fillRect(18, -76, 18, 8);
-  } else if (o.id === "oil") {
-    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 64, 32, -0.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-18, -8, 22, 9, -0.4, 0, Math.PI * 2); ctx.fill();
+function applyExtraLifeToDuoPlayer(player) {
+  if (player.lives < player.maxLives) {
+    player.lives = Math.min(player.maxLives, player.lives + 1);
   } else {
-    ctx.fillStyle = "#f7f7f2"; roundedRect(-72, -27, 144, 54, 8); ctx.fill();
-    ctx.fillStyle = "#ff4f64"; for (let x = -58; x < 60; x += 36) ctx.fillRect(x, -24, 18, 48);
+    player.maxLives += 1;
+    player.lives += 1;
   }
-  ctx.restore();
+  duoSetMessage(`${player.label} grabbed an extra life. ${player.lives}/${player.maxLives}.`);
+}
+
+function collectPickup(entity) {
+  const p = state.player;
+  entity.hit = true;
+  if (entity.id === "life") {
+    applyExtraLifeToRun();
+  } else if (entity.id === "autopilot") {
+    p.autopilot = ownsUpgrade("auto-chip") ? 7.5 : 5;
+    p.recoveryShield = 0;
+    setMessage(`Autopilot active for ${Math.round(p.autopilot)} seconds.`);
+  } else if (entity.id === "immortal") {
+    p.immortal = 5;
+    p.recoveryShield = 0;
+    setMessage("Immortality active for 5 seconds.");
+  } else if (entity.id === "cash-multiplier") {
+    state.cashMultiplier = 2;
+    state.cashMultiplierTimer = 8;
+    setMessage("Cash multiplier active. Cash grabs are doubled.");
+  } else if (entity.id === "gold-jackpot") {
+    p.goldJackpot = true;
+    p.autopilot = Infinity;
+    p.immortal = Infinity;
+    state.cashMultiplier = 100;
+    state.cashMultiplierTimer = Infinity;
+    state.cash += 1000;
+    setMessage("SUPER GOLD JACKPOT. Infinite immunity, autopilot, and x100 cash.");
+  } else {
+    const base = 25 + state.heat * 8;
+    const magnet = ownsUpgrade("cash-magnet") ? 1.5 : 1;
+    const value = Math.round(base * magnet * (state.cashMultiplier || 1));
+    state.cash += value;
+    setMessage(`Grabbed $${value}.`);
+  }
+}
+
+function duoCollectPickup(player, entity) {
+  entity.hit = true;
+  if (entity.id === "life") {
+    applyExtraLifeToDuoPlayer(player);
+  } else if (entity.id === "autopilot") {
+    player.autopilot = ownsUpgrade("auto-chip") ? 7.5 : 5;
+    player.recoveryShield = 0;
+    duoSetMessage(`${player.label} got autopilot.`);
+  } else if (entity.id === "immortal") {
+    player.immortal = 5;
+    player.recoveryShield = 0;
+    duoSetMessage(`${player.label} is immortal.`);
+  } else if (entity.id === "cash-multiplier") {
+    state.cashMultiplier = 2;
+    state.cashMultiplierTimer = 8;
+    duoSetMessage(`${player.label} doubled cash grabs.`);
+  } else if (entity.id === "gold-jackpot") {
+    player.goldJackpot = true;
+    player.autopilot = Infinity;
+    player.immortal = Infinity;
+    state.cashMultiplier = 100;
+    state.cashMultiplierTimer = Infinity;
+    state.cash += 1000;
+    duoSetMessage(`${player.label} found the super gold jackpot.`);
+  } else {
+    const base = 25 + state.heat * 8;
+    const magnet = ownsUpgrade("cash-magnet") ? 1.5 : 1;
+    const value = Math.round(base * magnet * (state.cashMultiplier || 1));
+    state.cash += value;
+    duoSetMessage(`${player.label} grabbed $${value}.`);
+  }
 }
 
 function collide(a, b) {
   if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
-  if (isLaneSurgeActive() && b?.kind === "obstacle") {
-    return Math.abs(a.y - b.y) < (a.height + b.height) * 0.34;
-  }
   const bx = entityLaneX(b);
-  return Math.abs(a.x - bx) < (a.width + b.width) * 0.5 &&
-    Math.abs(a.y - b.y) < (a.height + b.height) * 0.5;
+  const playerWidth = laneModeCompactScale() ? 28 : Math.min(a.width || 82, 58);
+  const playerHeight = laneModeCompactScale() ? 74 : Math.min(a.height || 122, 96);
+  const objectWidth = laneModeCompactScale() ? 28 : Math.min(b.width || 80, b.kind === "obstacle" ? 54 : 62);
+  const objectHeight = laneModeCompactScale() ? Math.min(b.height || 70, 58) : Math.min(b.height || 90, 82);
+  return Math.abs(a.x - bx) < (playerWidth + objectWidth) * 0.5 &&
+    Math.abs(a.y - b.y) < (playerHeight + objectHeight) * 0.5;
 }
 
-const menuHtmlBeforeV17 = menuHtml;
-function menuHtml() {
-  return menuHtmlBeforeV17()
-    .replace('Lane Surge <small>New lanes every 1000 m</small>', 'Lane Surge <small>3 wide equal lanes</small>');
-}
-
-state.buildVersion = "premium-rehan-gold-v17";
+state.buildVersion = "premium-rehan-gold-v20";
 if (["menu", "info", "shop"].includes(state.mode)) {
   showMenu();
   updateHud();
 }
 
-/* v18: direct menu and car renderers, no wrappers. */
+/* premium-rehan-gold-v21: hidden RehanAdmin test mode for focused powerup checks. */
+modes.testmode = {
+  label: "testmode",
+  lives: 5,
+  heatRate: 999999,
+  spawnOffset: 0.22,
+  pickupDelay: -2.8,
+  abilityBias: 10,
+  testMode: true,
+};
+
+function isRehanAdmin() {
+  return cleanName(state.username).toLowerCase() === "rehanadmin";
+}
+
+function leaderboardModesForMenu() {
+  return isRehanAdmin()
+    ? ["easy", "medium", "hard", "laneSurge", "duoDash", "testmode"]
+    : ["easy", "medium", "hard", "laneSurge", "duoDash"];
+}
+
 function menuHtml() {
   const profile = getProfile(state.username || "Driver");
   const ownedPfps = pfps.filter((item) => profile.ownedPfps.includes(item.id));
-  const boardHtml = ["easy", "medium", "hard", "laneSurge", "duoDash"].map(leaderboardCardHtml).join("");
+  const adminUnlocked = cleanName(profile.name).toLowerCase() === "rehanadmin";
+  const boardModes = leaderboardModesForMenu();
+  const boardHtml = boardModes.map(leaderboardCardHtml).join("");
+  const testButton = adminUnlocked
+    ? `<button data-start="testmode" type="button" class="testmode-button">testmode <small>Admin: Extra Life lab</small></button>`
+    : "";
   return `
     <section class="hero-menu cinematic-menu">
       <div class="hero-copy">
@@ -3405,132 +3378,1042 @@ function menuHtml() {
     </label>
     <div class="pfp-picker emoji-picker">${ownedPfps.map((item) => `<button data-equip-pfp="${item.id}" type="button" class="pfp-choice ${profile.equippedPfp === item.id ? "selected" : ""}">${pfpHtml(item.id)}<span>${item.name}</span></button>`).join("")}</div>
     ${profileKey(profile.name) === "rehan" ? `<p class="rehan-banner">Rehan mode unlocked: every skin, pfp, and upgrade is yours.</p>` : ""}
+    ${adminUnlocked ? `<p class="rehan-banner admin-banner">Admin testing unlocked: testmode is available for Extra Life checks.</p>` : ""}
     <h2>Choose Mode</h2>
-    <div class="mode-grid premium-modes five-modes">
+    <div class="mode-grid premium-modes ${adminUnlocked ? "six-modes" : "five-modes"}">
       <button data-start="easy" type="button">Easy <small>5 lives</small></button>
       <button data-start="medium" type="button">Medium <small>3 lives</small></button>
       <button data-start="hard" type="button">Hard <small>1 life</small></button>
       <button data-start="laneSurge" type="button">Lane Surge <small>3 wide equal lanes</small></button>
       <button data-start="duoDash" type="button">Split Heist <small>Left WASD, right arrow keys</small></button>
+      ${testButton}
     </div>
     <div class="menu-actions big-actions">
       <button data-view="shop" type="button">Shop</button>
       <button data-view="info" type="button">Information</button>
     </div>
     <h2>Leaderboards</h2>
-    <div class="leaderboards aesthetic-leaderboards five-boards">${boardHtml}</div>
+    <div class="leaderboards aesthetic-leaderboards ${adminUnlocked ? "six-boards" : "five-boards"}">${boardHtml}</div>
   `;
 }
 
-function drawCar(x, y, body, trim = "#111318") {
-  const compact = isLaneSurgeActive() && !state.duo?.active;
-  const scale = compact ? 0.72 : 1;
-  const jackpot = state.player.goldJackpot || body === "gold";
-  ctx.save();
-  ctx.translate(roadX(x), y);
-  ctx.scale(scale, scale);
-  const speedFactor = Math.min(1, (state.player?.speed || 90) / 128);
-  const wheelSpin = state.roadOffset * 0.18 + performance.now() * 0.008 * speedFactor;
-  const bob = Math.sin(performance.now() * 0.018) * 2.2 * speedFactor;
-  ctx.translate(0, bob);
-  ctx.fillStyle = "rgba(0,0,0,0.34)";
-  ctx.beginPath(); ctx.ellipse(0, 30, 56, 23, 0, 0, Math.PI * 2); ctx.fill();
-  function wheel(wx, wy) {
-    ctx.save(); ctx.translate(wx, wy); ctx.rotate(wheelSpin); ctx.fillStyle = "#05080c"; roundedRect(-9, -15, 18, 30, 5); ctx.fill(); ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.moveTo(0, -9); ctx.lineTo(0, 9); ctx.stroke(); ctx.restore();
+function difficulty() {
+  const mode = modes[state.selectedMode] || modes.medium;
+  const heat = state.heat;
+  const turbo = ownsUpgrade("turbo-tune") ? 9 : 0;
+  const grip = ownsUpgrade("street-grip") ? 1.8 : 0;
+  const radar = ownsUpgrade("pickup-radar") ? -0.45 : 0;
+  const lanePressure = Math.max(0, currentLaneCount() - 3) * 0.02;
+  if (mode.testMode) {
+    return {
+      topSpeed: 108 + turbo,
+      accel: 18,
+      handling: 9.7 + grip,
+      spawnEvery: 1.55,
+      pickupEvery: 0.9,
+      obstacleSpeed: 355 + heat * 14,
+    };
   }
-  wheel(-43, -47); wheel(43, -47); wheel(-43, 43); wheel(43, 43);
-  const paint = ctx.createLinearGradient(-42, -70, 42, 70);
-  if (jackpot) { paint.addColorStop(0, "#fff8bf"); paint.addColorStop(0.45, "#ffd447"); paint.addColorStop(1, "#9b6a00"); }
-  else { paint.addColorStop(0, "#ffffff"); paint.addColorStop(0.1, body); paint.addColorStop(0.78, body); paint.addColorStop(1, "#14202b"); }
-  ctx.fillStyle = paint; roundedRect(-38, -68, 76, 136, 16); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.36)"; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = jackpot ? "rgba(50,30,0,0.72)" : "rgba(7,17,26,0.82)";
-  roundedRect(-27, -47, 54, 36, 10); ctx.fill(); roundedRect(-25, 15, 50, 34, 10); ctx.fill();
-  ctx.fillStyle = jackpot ? "#fff8bf" : "#ffe58b"; ctx.fillRect(-29, -72, 16, 8); ctx.fillRect(13, -72, 16, 8);
-  ctx.fillStyle = jackpot ? "#ffef8a" : "#ff5d58"; ctx.fillRect(-29, 65, 16, 7); ctx.fillRect(13, 65, 16, 7);
-  ctx.restore();
+  return {
+    topSpeed: 116 + turbo,
+    accel: 18,
+    handling: 8.9 + grip,
+    spawnEvery: Math.max(0.5, 1.18 + mode.spawnOffset - heat * 0.04 + lanePressure),
+    pickupEvery: Math.max(1.75, 3.8 + mode.pickupDelay + radar - heat * 0.05),
+    obstacleSpeed: 385 + heat * 27,
+  };
 }
 
-state.buildVersion = "premium-rehan-gold-v18";
+function weightedPickupType() {
+  if (modes[state.selectedMode]?.testMode) {
+    return pickupTypes.find((pickup) => pickup.id === "life");
+  }
+  const mode = modes[state.selectedMode] || modes.medium;
+  const heatPressure = Math.max(0.2, 1 - (state.heat - 1) * 0.06);
+  const abilityWeight = mode.abilityBias * heatPressure;
+  const weights = [
+    ["life", 1.05 * abilityWeight],
+    ["autopilot", 0.82 * abilityWeight],
+    ["immortal", 0.62 * abilityWeight],
+    ["cash", 1.1 + state.heat * 0.16 + (1 - mode.abilityBias) * 2.4],
+  ];
+  if (pickupTypes.some((pickup) => pickup.id === "cash-multiplier")) weights.push(["cash-multiplier", 0.42 * abilityWeight]);
+  if (pickupTypes.some((pickup) => pickup.id === "gold-jackpot")) weights.push(["gold-jackpot", Math.max(0.001, weights.find(([id]) => id === "cash")[1] * 0.01)]);
+  let total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (const [id, weight] of weights) {
+    roll -= weight;
+    if (roll <= 0) return pickupTypes.find((pickup) => pickup.id === id);
+  }
+  return pickupTypes.find((pickup) => pickup.id === "cash");
+}
+
+function resetRun(mode) {
+  syncProfileFromInput();
+  if (mode === "testmode" && !isRehanAdmin()) {
+    state.selectedMode = "medium";
+    showMenu();
+    return;
+  }
+  if (mode === "duoDash") {
+    resetDuoIntro();
+    return;
+  }
+  if (state.duo) state.duo.active = false;
+  state.roadCenterOverride = null;
+  const config = modes[mode] || modes.medium;
+  const bonusLife = ownsUpgrade("reinforced-frame") ? 1 : 0;
+  const launchBonus = ownsUpgrade("launch-tune") ? 18 : 0;
+  state.mode = "playing";
+  state.selectedMode = mode;
+  state.maxLives = config.lives + bonusLife;
+  state.lives = config.lives + bonusLife;
+  state.heat = 1;
+  state.cash = 0;
+  state.cashBanked = false;
+  state.score = 0;
+  state.lastStandUsed = false;
+  state.player.lane = 1;
+  state.player.x = lanes[state.player.lane] || 0;
+  state.player.targetX = state.player.x;
+  state.player.y = 500;
+  state.player.speed = 88 + launchBonus;
+  state.player.invulnerable = 1;
+  state.player.immortal = 0;
+  state.player.autopilot = 0;
+  state.player.recoveryShield = 0;
+  state.player.goldJackpot = false;
+  state.entities = [];
+  state.roadOffset = 0;
+  state.runDistance = 0;
+  state.spawnTimer = config.testMode ? 0.85 : 0.7;
+  state.pickupTimer = config.testMode ? 0.25 : 1.8;
+  state.crashHeat = 0;
+  state.cashMultiplier = 1;
+  state.cashMultiplierTimer = 0;
+  setLaneCount(3);
+  state.player.lane = Math.floor(lanes.length / 2);
+  state.player.x = lanes[state.player.lane];
+  state.player.targetX = lanes[state.player.lane];
+  setMessage(config.testMode ? "testmode: Extra Life pickups are spawning for admin testing." : "");
+  ui.screen.classList.add("hidden");
+  updateHud();
+}
+
+document.addEventListener("input", (event) => {
+  if (event.target?.id !== "driverName") return;
+  const wasAdmin = isRehanAdmin();
+  state.username = cleanName(event.target.value);
+  state.profile = getProfile(state.username);
+  const nowAdmin = isRehanAdmin();
+  if (nowAdmin || wasAdmin) showMenu();
+});
+
+state.buildVersion = "premium-rehan-gold-v21";
 if (["menu", "info", "shop"].includes(state.mode)) {
   showMenu();
   updateHud();
 }
 
-/* v19: extra-compact Lane Surge car, obstacles, and hitboxes. */
-function laneModeCompactScale() {
-  return isLaneSurgeActive() && !state.duo?.active;
+/* premium-rehan-gold-v22: golden jackpot appears at 5 in 1000 pickup rolls. */
+const GOLD_JACKPOT_PICKUP_CHANCE = 5 / 1000;
+
+function weightedPickupType() {
+  if (modes[state.selectedMode]?.testMode) {
+    return pickupTypes.find((pickup) => pickup.id === "life");
+  }
+  const goldPickup = pickupTypes.find((pickup) => pickup.id === "gold-jackpot");
+  if (goldPickup && Math.random() < GOLD_JACKPOT_PICKUP_CHANCE) return goldPickup;
+
+  const mode = modes[state.selectedMode] || modes.medium;
+  const heatPressure = Math.max(0.2, 1 - (state.heat - 1) * 0.06);
+  const abilityWeight = mode.abilityBias * heatPressure;
+  const weights = [
+    ["life", 1.05 * abilityWeight],
+    ["autopilot", 0.82 * abilityWeight],
+    ["immortal", 0.62 * abilityWeight],
+    ["cash", 1.1 + state.heat * 0.16 + (1 - mode.abilityBias) * 2.4],
+  ];
+  if (pickupTypes.some((pickup) => pickup.id === "cash-multiplier")) weights.push(["cash-multiplier", 0.42 * abilityWeight]);
+
+  let total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (const [id, weight] of weights) {
+    roll -= weight;
+    if (roll <= 0) return pickupTypes.find((pickup) => pickup.id === id);
+  }
+  return pickupTypes.find((pickup) => pickup.id === "cash");
+}
+
+state.buildVersion = "premium-rehan-gold-v22";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v23: testmode now tests the golden jackpot powerup. */
+function weightedPickupType() {
+  if (modes[state.selectedMode]?.testMode) {
+    return pickupTypes.find((pickup) => pickup.id === "gold-jackpot") || pickupTypes.find((pickup) => pickup.id === "life");
+  }
+  const goldPickup = pickupTypes.find((pickup) => pickup.id === "gold-jackpot");
+  if (goldPickup && Math.random() < GOLD_JACKPOT_PICKUP_CHANCE) return goldPickup;
+
+  const mode = modes[state.selectedMode] || modes.medium;
+  const heatPressure = Math.max(0.2, 1 - (state.heat - 1) * 0.06);
+  const abilityWeight = mode.abilityBias * heatPressure;
+  const weights = [
+    ["life", 1.05 * abilityWeight],
+    ["autopilot", 0.82 * abilityWeight],
+    ["immortal", 0.62 * abilityWeight],
+    ["cash", 1.1 + state.heat * 0.16 + (1 - mode.abilityBias) * 2.4],
+  ];
+  if (pickupTypes.some((pickup) => pickup.id === "cash-multiplier")) weights.push(["cash-multiplier", 0.42 * abilityWeight]);
+
+  let total = weights.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (const [id, weight] of weights) {
+    roll -= weight;
+    if (roll <= 0) return pickupTypes.find((pickup) => pickup.id === id);
+  }
+  return pickupTypes.find((pickup) => pickup.id === "cash");
+}
+
+function menuHtml() {
+  const profile = getProfile(state.username || "Driver");
+  const ownedPfps = pfps.filter((item) => profile.ownedPfps.includes(item.id));
+  const adminUnlocked = cleanName(profile.name).toLowerCase() === "rehanadmin";
+  const boardModes = leaderboardModesForMenu();
+  const boardHtml = boardModes.map(leaderboardCardHtml).join("");
+  const testButton = adminUnlocked
+    ? `<button data-start="testmode" type="button" class="testmode-button">testmode <small>Admin: golden jackpot lab</small></button>`
+    : "";
+  return `
+    <section class="hero-menu cinematic-menu">
+      <div class="hero-copy">
+        <p class="eyebrow">Endless arcade driving</p>
+        <h1 class="animated-title">Bolt Heist</h1>
+        <p class="subtitle">Dodge traffic, grab road cash, unlock wild cosmetics, and survive the wildest getaway modes.</p>
+      </div>
+      <div class="profile-badge premium-profile">
+        ${pfpHtml(profile.equippedPfp, "large")}
+        <span>${profile.name}</span>
+        <strong>$${profile.wallet}</strong>
+      </div>
+      <div class="menu-road-art" aria-hidden="true"><span></span><span></span><span></span></div>
+    </section>
+    <label class="name-field premium-name">
+      <span>Driver name</span>
+      <input id="driverName" maxlength="16" placeholder="Your name" value="${state.username}">
+    </label>
+    <div class="pfp-picker emoji-picker">${ownedPfps.map((item) => `<button data-equip-pfp="${item.id}" type="button" class="pfp-choice ${profile.equippedPfp === item.id ? "selected" : ""}">${pfpHtml(item.id)}<span>${item.name}</span></button>`).join("")}</div>
+    ${profileKey(profile.name) === "rehan" ? `<p class="rehan-banner">Rehan mode unlocked: every skin, pfp, and upgrade is yours.</p>` : ""}
+    ${adminUnlocked ? `<p class="rehan-banner admin-banner">Admin testing unlocked: testmode now spawns the golden jackpot powerup.</p>` : ""}
+    <h2>Choose Mode</h2>
+    <div class="mode-grid premium-modes ${adminUnlocked ? "six-modes" : "five-modes"}">
+      <button data-start="easy" type="button">Easy <small>5 lives</small></button>
+      <button data-start="medium" type="button">Medium <small>3 lives</small></button>
+      <button data-start="hard" type="button">Hard <small>1 life</small></button>
+      <button data-start="laneSurge" type="button">Lane Surge <small>3 wide equal lanes</small></button>
+      <button data-start="duoDash" type="button">Split Heist <small>Left WASD, right arrow keys</small></button>
+      ${testButton}
+    </div>
+    <div class="menu-actions big-actions">
+      <button data-view="shop" type="button">Shop</button>
+      <button data-view="info" type="button">Information</button>
+    </div>
+    <h2>Leaderboards</h2>
+    <div class="leaderboards aesthetic-leaderboards ${adminUnlocked ? "six-boards" : "five-boards"}">${boardHtml}</div>
+  `;
+}
+
+function resetRun(mode) {
+  syncProfileFromInput();
+  if (mode === "testmode" && !isRehanAdmin()) {
+    state.selectedMode = "medium";
+    showMenu();
+    return;
+  }
+  if (mode === "duoDash") {
+    resetDuoIntro();
+    return;
+  }
+  if (state.duo) state.duo.active = false;
+  state.roadCenterOverride = null;
+  const config = modes[mode] || modes.medium;
+  const bonusLife = ownsUpgrade("reinforced-frame") ? 1 : 0;
+  const launchBonus = ownsUpgrade("launch-tune") ? 18 : 0;
+  state.mode = "playing";
+  state.selectedMode = mode;
+  state.maxLives = config.lives + bonusLife;
+  state.lives = config.lives + bonusLife;
+  state.heat = 1;
+  state.cash = 0;
+  state.cashBanked = false;
+  state.score = 0;
+  state.lastStandUsed = false;
+  state.player.lane = 1;
+  state.player.x = lanes[state.player.lane] || 0;
+  state.player.targetX = state.player.x;
+  state.player.y = 500;
+  state.player.speed = 88 + launchBonus;
+  state.player.invulnerable = 1;
+  state.player.immortal = 0;
+  state.player.autopilot = 0;
+  state.player.recoveryShield = 0;
+  state.player.goldJackpot = false;
+  state.entities = [];
+  state.roadOffset = 0;
+  state.runDistance = 0;
+  state.spawnTimer = config.testMode ? 0.85 : 0.7;
+  state.pickupTimer = config.testMode ? 0.25 : 1.8;
+  state.crashHeat = 0;
+  state.cashMultiplier = 1;
+  state.cashMultiplierTimer = 0;
+  setLaneCount(3);
+  state.player.lane = Math.floor(lanes.length / 2);
+  state.player.x = lanes[state.player.lane];
+  state.player.targetX = lanes[state.player.lane];
+  setMessage(config.testMode ? "testmode: golden jackpot powerups are spawning for admin testing." : "");
+  ui.screen.classList.add("hidden");
+  updateHud();
+}
+
+state.buildVersion = "premium-rehan-gold-v23";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v24: flat 2D road so lane objects never visually stick outside. */
+function flatRoadBounds() {
+  const laneCenters = lanes.length ? lanes : [-270, 0, 270];
+  const laneGap = laneCenters.length > 1 ? Math.abs(laneCenters[1] - laneCenters[0]) : 270;
+  const halfLane = Math.max(122, laneGap / 2);
+  const left = Math.max(48, roadX(laneCenters[0]) - halfLane);
+  const right = Math.min(canvas.width - 48, roadX(laneCenters[laneCenters.length - 1]) + halfLane);
+  return { left, right, width: right - left, laneGap, halfLane };
+}
+
+function drawRoad() {
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, "#10263c");
+  sky.addColorStop(0.46, "#21465a");
+  sky.addColorStop(1, "#101923");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.23;
+  ctx.fillStyle = "#ffffff";
+  for (let i = 0; i < 7; i++) {
+    const x = (i * 190 - state.roadOffset * 0.04) % (canvas.width + 220) - 100;
+    ctx.beginPath();
+    ctx.ellipse(x, 72 + (i % 3) * 42, 74, 15, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 45, 78 + (i % 3) * 42, 48, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  drawMountains(245, "#cddbe0", "#536b76", 0.13);
+  drawMountains(340, "#71877f", "#263b36", 0.24);
+
+  const ground = ctx.createLinearGradient(0, canvas.height * 0.38, 0, canvas.height);
+  ground.addColorStop(0, "#334939");
+  ground.addColorStop(1, "#0e1917");
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, canvas.height * 0.38, canvas.width, canvas.height * 0.62);
+
+  const bounds = flatRoadBounds();
+  ctx.fillStyle = "#141a21";
+  ctx.fillRect(bounds.left - 18, 0, bounds.width + 36, canvas.height);
+
+  const road = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  road.addColorStop(0, "#3b444f");
+  road.addColorStop(0.5, "#262e37");
+  road.addColorStop(1, "#171d24");
+  ctx.fillStyle = road;
+  ctx.fillRect(bounds.left, 0, bounds.width, canvas.height);
+
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  for (const laneCenter of lanes) {
+    ctx.fillRect(roadX(laneCenter) - bounds.halfLane + 5, 0, bounds.halfLane * 2 - 10, canvas.height);
+  }
+
+  ctx.strokeStyle = "rgba(255,225,145,0.94)";
+  ctx.lineWidth = 6;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(bounds.left + 4, 0);
+  ctx.lineTo(bounds.left + 4, canvas.height);
+  ctx.moveTo(bounds.right - 4, 0);
+  ctx.lineTo(bounds.right - 4, canvas.height);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.72)";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([28, 34]);
+  ctx.lineDashOffset = state.roadOffset * 1.8;
+  for (let i = 1; i < lanes.length; i++) {
+    const x = roadX((lanes[i - 1] + lanes[i]) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x, -40);
+    ctx.lineTo(x, canvas.height + 40);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = "#000";
+  for (let y = ((state.roadOffset * 1.35) % 90) - 90; y < canvas.height; y += 90) {
+    ctx.fillRect(bounds.left, y, bounds.width, 2);
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(8,13,21,0.64)";
+  roundedRect(18, canvas.height - 56, 218, 38, 8);
+  ctx.fillStyle = "#f8fbff";
+  ctx.font = "900 14px sans-serif";
+  ctx.fillText(`${lanes.length} lanes active`, 36, canvas.height - 32);
+}
+
+state.buildVersion = "premium-rehan-gold-v24";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v25: road animation runs at 1.75x visual speed. */
+const ROAD_VISUAL_SPEED = 1.75;
+
+function drawRoad() {
+  const visualOffset = state.roadOffset * ROAD_VISUAL_SPEED;
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, "#10263c");
+  sky.addColorStop(0.46, "#21465a");
+  sky.addColorStop(1, "#101923");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.globalAlpha = 0.23;
+  ctx.fillStyle = "#ffffff";
+  for (let i = 0; i < 7; i++) {
+    const x = (i * 190 - visualOffset * 0.04) % (canvas.width + 220) - 100;
+    ctx.beginPath();
+    ctx.ellipse(x, 72 + (i % 3) * 42, 74, 15, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 45, 78 + (i % 3) * 42, 48, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  drawMountains(245, "#cddbe0", "#536b76", 0.13 * ROAD_VISUAL_SPEED);
+  drawMountains(340, "#71877f", "#263b36", 0.24 * ROAD_VISUAL_SPEED);
+
+  const ground = ctx.createLinearGradient(0, canvas.height * 0.38, 0, canvas.height);
+  ground.addColorStop(0, "#334939");
+  ground.addColorStop(1, "#0e1917");
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, canvas.height * 0.38, canvas.width, canvas.height * 0.62);
+
+  const bounds = flatRoadBounds();
+  ctx.fillStyle = "#141a21";
+  ctx.fillRect(bounds.left - 18, 0, bounds.width + 36, canvas.height);
+
+  const road = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  road.addColorStop(0, "#3b444f");
+  road.addColorStop(0.5, "#262e37");
+  road.addColorStop(1, "#171d24");
+  ctx.fillStyle = road;
+  ctx.fillRect(bounds.left, 0, bounds.width, canvas.height);
+
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  for (const laneCenter of lanes) {
+    ctx.fillRect(roadX(laneCenter) - bounds.halfLane + 5, 0, bounds.halfLane * 2 - 10, canvas.height);
+  }
+
+  ctx.strokeStyle = "rgba(255,225,145,0.94)";
+  ctx.lineWidth = 6;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(bounds.left + 4, 0);
+  ctx.lineTo(bounds.left + 4, canvas.height);
+  ctx.moveTo(bounds.right - 4, 0);
+  ctx.lineTo(bounds.right - 4, canvas.height);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.72)";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([28, 34]);
+  ctx.lineDashOffset = visualOffset * 1.8;
+  for (let i = 1; i < lanes.length; i++) {
+    const x = roadX((lanes[i - 1] + lanes[i]) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x, -40);
+    ctx.lineTo(x, canvas.height + 40);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = "#000";
+  for (let y = ((visualOffset * 1.35) % 90) - 90; y < canvas.height; y += 90) {
+    ctx.fillRect(bounds.left, y, bounds.width, 2);
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(8,13,21,0.64)";
+  roundedRect(18, canvas.height - 56, 218, 38, 8);
+  ctx.fillStyle = "#f8fbff";
+  ctx.font = "900 14px sans-serif";
+  ctx.fillText(`${lanes.length} lanes active`, 36, canvas.height - 32);
+}
+
+state.buildVersion = "premium-rehan-gold-v25";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v26: remove Lane Surge and flatten/even Split Heist roads. */
+function leaderboardModesForMenu() {
+  return isRehanAdmin()
+    ? ["easy", "medium", "hard", "duoDash", "testmode"]
+    : ["easy", "medium", "hard", "duoDash"];
+}
+
+function menuHtml() {
+  const profile = getProfile(state.username || "Driver");
+  const ownedPfps = pfps.filter((item) => profile.ownedPfps.includes(item.id));
+  const adminUnlocked = cleanName(profile.name).toLowerCase() === "rehanadmin";
+  const boardHtml = leaderboardModesForMenu().map(leaderboardCardHtml).join("");
+  const testButton = adminUnlocked
+    ? `<button data-start="testmode" type="button" class="testmode-button">testmode <small>Admin: golden jackpot lab</small></button>`
+    : "";
+  return `
+    <section class="hero-menu cinematic-menu">
+      <div class="hero-copy">
+        <p class="eyebrow">Endless arcade driving</p>
+        <h1 class="animated-title">Bolt Heist</h1>
+        <p class="subtitle">Dodge traffic, grab road cash, unlock wild cosmetics, and survive the wildest getaway modes.</p>
+      </div>
+      <div class="profile-badge premium-profile">
+        ${pfpHtml(profile.equippedPfp, "large")}
+        <span>${profile.name}</span>
+        <strong>$${profile.wallet}</strong>
+      </div>
+      <div class="menu-road-art" aria-hidden="true"><span></span><span></span><span></span></div>
+    </section>
+    <label class="name-field premium-name">
+      <span>Driver name</span>
+      <input id="driverName" maxlength="16" placeholder="Your name" value="${state.username}">
+    </label>
+    <div class="pfp-picker emoji-picker">${ownedPfps.map((item) => `<button data-equip-pfp="${item.id}" type="button" class="pfp-choice ${profile.equippedPfp === item.id ? "selected" : ""}">${pfpHtml(item.id)}<span>${item.name}</span></button>`).join("")}</div>
+    ${profileKey(profile.name) === "rehan" ? `<p class="rehan-banner">Rehan mode unlocked: every skin, pfp, and upgrade is yours.</p>` : ""}
+    ${adminUnlocked ? `<p class="rehan-banner admin-banner">Admin testing unlocked: testmode spawns the golden jackpot powerup.</p>` : ""}
+    <h2>Choose Mode</h2>
+    <div class="mode-grid premium-modes ${adminUnlocked ? "five-modes" : "four-modes"}">
+      <button data-start="easy" type="button">Easy <small>5 lives</small></button>
+      <button data-start="medium" type="button">Medium <small>3 lives</small></button>
+      <button data-start="hard" type="button">Hard <small>1 life</small></button>
+      <button data-start="duoDash" type="button">Split Heist <small>Two even 2D roads</small></button>
+      ${testButton}
+    </div>
+    <div class="menu-actions big-actions">
+      <button data-view="shop" type="button">Shop</button>
+      <button data-view="info" type="button">Information</button>
+    </div>
+    <h2>Leaderboards</h2>
+    <div class="leaderboards aesthetic-leaderboards ${adminUnlocked ? "five-boards" : "four-modes"}">${boardHtml}</div>
+  `;
+}
+
+function duoRoads() {
+  const roadWidth = 360;
+  const leftCenter = canvas.width * 0.27;
+  const rightCenter = canvas.width * 0.73;
+  const lanes = [-96, 0, 96];
+  return [
+    { id: 0, label: "WASD", center: leftCenter, left: leftCenter - roadWidth / 2, right: leftCenter + roadWidth / 2, lanes: [...lanes], color: "#54e08b" },
+    { id: 1, label: "Arrow Keys", center: rightCenter, left: rightCenter - roadWidth / 2, right: rightCenter + roadWidth / 2, lanes: [...lanes], color: "#37d5ff" },
+  ];
+}
+
+function resetDuoIntro() {
+  syncProfileFromInput();
+  state.selectedMode = "duoDash";
+  state.mode = "duoIntro";
+  state.heat = 1;
+  state.cash = 0;
+  state.cashBanked = false;
+  state.score = 0;
+  state.runDistance = 0;
+  state.roadOffset = 0;
+  state.duo = {
+    active: true,
+    roads: duoRoads(),
+    players: [makeDuoPlayer(0, "Left Driver", "#54e08b"), makeDuoPlayer(1, "Right Driver", "#37d5ff")],
+    entities: [],
+    spawnTimer: 0.85,
+    pickupTimer: 1.9,
+    message: "",
+    messageTimer: 0,
+  };
+  ui.screen.classList.remove("hidden");
+  panel.innerHTML = `
+    <p class="eyebrow">Two-player mode</p>
+    <h1>Split Heist</h1>
+    <p>Two flat, even roads. The left side uses WASD. The right side uses the arrow keys.</p>
+    <div class="mode-grid premium-modes duo-instructions">
+      <button type="button" disabled>Left Road <small>WASD / A and D to switch lanes</small></button>
+      <button type="button" disabled>Right Road <small>Arrow keys / left and right to switch lanes</small></button>
+    </div>
+    <div class="actions"><button data-duo-go type="button">Start Split Heist</button><button data-view="menu" type="button">Back to Menu</button></div>
+  `;
+  updateHud();
+}
+
+function drawDuoRoad(road) {
+  const left = road.left;
+  const right = road.right;
+  const width = right - left;
+  ctx.fillStyle = "#111820";
+  ctx.fillRect(left - 14, 0, width + 28, canvas.height);
+  const roadGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  roadGradient.addColorStop(0, "#3b444f");
+  roadGradient.addColorStop(0.55, "#252d36");
+  roadGradient.addColorStop(1, "#171d24");
+  ctx.fillStyle = roadGradient;
+  ctx.fillRect(left, 0, width, canvas.height);
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  const halfLane = Math.abs(road.lanes[1] - road.lanes[0]) / 2;
+  for (const laneCenter of road.lanes) {
+    ctx.fillRect(road.center + laneCenter - halfLane + 4, 0, halfLane * 2 - 8, canvas.height);
+  }
+  ctx.strokeStyle = "rgba(255,225,145,0.9)";
+  ctx.lineWidth = 5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(left + 4, 0);
+  ctx.lineTo(left + 4, canvas.height);
+  ctx.moveTo(right - 4, 0);
+  ctx.lineTo(right - 4, canvas.height);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.66)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([24, 30]);
+  ctx.lineDashOffset = state.roadOffset * 1.8 * (typeof ROAD_VISUAL_SPEED === "number" ? ROAD_VISUAL_SPEED : 1);
+  for (let i = 1; i < road.lanes.length; i++) {
+    const x = road.center + (road.lanes[i - 1] + road.lanes[i]) / 2;
+    ctx.beginPath();
+    ctx.moveTo(x, -40);
+    ctx.lineTo(x, canvas.height + 40);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(8,13,21,0.58)";
+  roundedRect(left + 10, 16, width - 20, 34, 8);
+  ctx.fillStyle = "#f8fbff";
+  ctx.font = "900 14px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(road.id === 0 ? "LEFT SIDE: WASD" : "RIGHT SIDE: ARROW KEYS", road.center, 38);
+  ctx.textAlign = "left";
+}
+
+function drawDuo() {
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, "#132947");
+  sky.addColorStop(0.45, "#244761");
+  sky.addColorStop(1, "#101820");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const ground = ctx.createLinearGradient(0, canvas.height * 0.38, 0, canvas.height);
+  ground.addColorStop(0, "#334939");
+  ground.addColorStop(1, "#0e1917");
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, canvas.height * 0.38, canvas.width, canvas.height * 0.62);
+  ctx.fillStyle = "rgba(255,255,255,0.13)";
+  ctx.fillRect(canvas.width / 2 - 3, 0, 6, canvas.height);
+  state.duo.roads.forEach(drawDuoRoad);
+  state.duo.entities.forEach((entity) => {
+    const road = state.duo.roads[entity.road];
+    entity.x = road.lanes[entity.lane];
+    state.roadCenterOverride = road.center;
+    entity.kind === "pickup" ? drawPickup(entity) : drawObstacle(entity);
+  });
+  state.duo.players.forEach((player, index) => {
+    const road = state.duo.roads[index];
+    state.roadCenterOverride = road.center;
+    const oldPlayer = state.player;
+    state.player = player;
+    if (player.alive) drawCar(player.x, player.y, duoCarColor(player));
+    state.player = oldPlayer;
+  });
+  state.roadCenterOverride = null;
+  drawDuoHudStrip();
+}
+
+state.buildVersion = "premium-rehan-gold-v26";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v27: lane-safe car, obstacle, pickup, and hitbox sizing. */
+const LANE_SAFE = {
+  carWidth: 42,
+  carHeight: 88,
+  pickupRadius: 20,
+  obstacle: {
+    cone: { width: 34, height: 44 },
+    barrier: { width: 54, height: 34 },
+    parked: { width: 50, height: 86 },
+    oil: { width: 54, height: 30 },
+    roadblock: { width: 58, height: 34 },
+  },
+};
+
+function laneSafeObstacleSize(id) {
+  return LANE_SAFE.obstacle[id] || { width: 54, height: 34 };
+}
+
+function laneSafeEntity(entity) {
+  if (!entity) return entity;
+  if (entity.kind === "obstacle") {
+    const size = laneSafeObstacleSize(entity.id);
+    entity.width = size.width;
+    entity.height = size.height;
+  } else if (entity.kind === "pickup") {
+    entity.width = entity.id === "gold-jackpot" ? 46 : 38;
+    entity.height = entity.id === "gold-jackpot" ? 46 : 38;
+  }
+  return entity;
+}
+
+function laneSafeEntities(list) {
+  return list.map(laneSafeEntity);
+}
+
+function spawnObstacleWave() {
+  syncLaneCountForMode();
+  const d = difficulty();
+  const pickupLanes = state.entities
+    .filter((entity) => entity.kind === "pickup" && entity.y > -260 && entity.y < 310)
+    .map((entity) => entity.lane);
+  const allLanes = lanes.map((_, lane) => lane);
+  const available = allLanes.filter((lane) => !pickupLanes.includes(lane));
+  const count = state.heat >= 3 && Math.random() < 0.42 ? 2 : 1;
+  const laneCount = Math.min(count, Math.max(1, (available.length || allLanes.length) - 1));
+  const blocked = [];
+  while (blocked.length < laneCount) {
+    const source = available.length ? available : allLanes;
+    const lane = source[Math.floor(Math.random() * source.length)];
+    if (!blocked.includes(lane)) blocked.push(lane);
+  }
+  blocked.forEach((lane, index) => {
+    const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+    const size = laneSafeObstacleSize(type.id);
+    state.entities.push({ ...type, ...size, kind: "obstacle", lane, x: lanes[lane], y: -230 - index * 162, speed: d.obstacleSpeed + Math.random() * 82, hit: false });
+  });
+}
+
+function spawnPickup() {
+  const d = difficulty();
+  const danger = state.entities
+    .filter((entity) => entity.kind === "obstacle" && entity.y > -300 && entity.y < 340)
+    .map((entity) => entity.lane);
+  const safeLanes = lanes.map((_, lane) => lane).filter((lane) => !danger.includes(lane));
+  const type = weightedPickupType();
+  const lane = safeLanes.length ? safeLanes[Math.floor(Math.random() * safeLanes.length)] : Math.floor(Math.random() * lanes.length);
+  const size = type.id === "gold-jackpot" ? 46 : 38;
+  state.entities.push({ ...type, width: size, height: size, kind: "pickup", lane, x: lanes[lane], y: -120, speed: d.obstacleSpeed * 0.94, hit: false });
+}
+
+function spawnDuoObstacleWave() {
+  const d = duoDifficulty();
+  for (const road of state.duo.roads) {
+    const pickupLanes = state.duo.entities.filter((e) => e.road === road.id && e.kind === "pickup" && e.y > -280 && e.y < 320).map((e) => e.lane);
+    const count = state.heat >= 4 && Math.random() < 0.34 ? 2 : 1;
+    const blocked = [];
+    while (blocked.length < count) {
+      const lane = randomDuoLane(road, [...pickupLanes, ...blocked]);
+      if (!blocked.includes(lane)) blocked.push(lane);
+      if (blocked.length >= road.lanes.length - 1) break;
+    }
+    blocked.forEach((lane, index) => {
+      const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+      const size = laneSafeObstacleSize(type.id);
+      state.duo.entities.push({ ...type, ...size, kind: "obstacle", road: road.id, lane, x: road.lanes[lane], y: -220 - index * 160, speed: d.obstacleSpeed + Math.random() * 70, hit: false });
+    });
+  }
+}
+
+function spawnDuoPickup() {
+  const d = duoDifficulty();
+  const road = state.duo.roads[Math.floor(Math.random() * state.duo.roads.length)];
+  const danger = state.duo.entities.filter((e) => e.road === road.id && e.kind === "obstacle" && e.y > -320 && e.y < 340).map((e) => e.lane);
+  const type = weightedPickupType();
+  const lane = randomDuoLane(road, danger);
+  const size = type.id === "gold-jackpot" ? 46 : 38;
+  state.duo.entities.push({ ...type, width: size, height: size, kind: "pickup", road: road.id, lane, x: road.lanes[lane], y: -130, speed: d.obstacleSpeed * 0.94, hit: false });
 }
 
 function collide(a, b) {
   if (typeof a?.lane === "number" && typeof b?.lane === "number" && a.lane !== b.lane) return false;
   const bx = entityLaneX(b);
-  const playerWidth = laneModeCompactScale() ? 28 : Math.min(a.width || 82, 58);
-  const playerHeight = laneModeCompactScale() ? 74 : Math.min(a.height || 122, 96);
-  const objectWidth = laneModeCompactScale() ? 28 : Math.min(b.width || 80, b.kind === "obstacle" ? 54 : 62);
-  const objectHeight = laneModeCompactScale() ? Math.min(b.height || 70, 58) : Math.min(b.height || 90, 82);
+  const bSafe = laneSafeEntity(b);
+  const playerWidth = LANE_SAFE.carWidth;
+  const playerHeight = LANE_SAFE.carHeight;
+  const objectWidth = bSafe.kind === "pickup" ? bSafe.width : laneSafeObstacleSize(bSafe.id).width;
+  const objectHeight = bSafe.kind === "pickup" ? bSafe.height : laneSafeObstacleSize(bSafe.id).height;
   return Math.abs(a.x - bx) < (playerWidth + objectWidth) * 0.5 &&
     Math.abs(a.y - b.y) < (playerHeight + objectHeight) * 0.5;
 }
 
 function drawCar(x, y, body, trim = "#111318") {
-  const scale = laneModeCompactScale() ? 0.52 : 0.86;
-  const jackpot = state.player.goldJackpot || body === "gold";
+  const hat = equippedCosmetic("hat")?.hat;
+  const speedFactor = Math.min(1.4, Math.max(0.7, (state.player?.speed || 90) / 110));
+  const wheelSpin = (performance.now() / 70) * speedFactor;
+  const bob = Math.sin(performance.now() / 95) * 1.5;
+  const laneLean = Math.max(-0.12, Math.min(0.12, ((state.player?.targetX || x) - x) * 0.0025));
   ctx.save();
-  ctx.translate(roadX(x), y);
-  ctx.scale(scale, scale);
-  const speedFactor = Math.min(1, (state.player?.speed || 90) / 128);
-  const wheelSpin = state.roadOffset * 0.18 + performance.now() * 0.008 * speedFactor;
-  const bob = Math.sin(performance.now() * 0.018) * 2.2 * speedFactor;
-  ctx.translate(0, bob);
+  ctx.translate(roadX(x), y + bob);
+  ctx.rotate(laneLean);
   ctx.fillStyle = "rgba(0,0,0,0.32)";
-  ctx.beginPath(); ctx.ellipse(0, 30, 50, 20, 0, 0, Math.PI * 2); ctx.fill();
-  function wheel(wx, wy) {
-    ctx.save(); ctx.translate(wx, wy); ctx.rotate(wheelSpin); ctx.fillStyle = "#05080c"; roundedRect(-8, -14, 16, 28, 5); ctx.fill(); ctx.strokeStyle = "#7b8494"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -8); ctx.lineTo(0, 8); ctx.stroke(); ctx.restore();
+  ctx.beginPath();
+  ctx.ellipse(0, 23, 32, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#05080c";
+  for (const wheel of [[-25, -37], [25, -37], [-25, 34], [25, 34]]) {
+    ctx.save();
+    ctx.translate(wheel[0], wheel[1]);
+    ctx.rotate(wheelSpin);
+    roundedRect(-6, -10, 12, 20, 4);
+    ctx.fillStyle = "#8e98a6";
+    ctx.fillRect(-1, -8, 2, 16);
+    ctx.restore();
+    ctx.fillStyle = "#05080c";
   }
-  wheel(-39, -45); wheel(39, -45); wheel(-39, 41); wheel(39, 41);
-  const paint = ctx.createLinearGradient(-36, -66, 36, 66);
-  if (jackpot) { paint.addColorStop(0, "#fff8bf"); paint.addColorStop(0.45, "#ffd447"); paint.addColorStop(1, "#9b6a00"); }
-  else { paint.addColorStop(0, "#ffffff"); paint.addColorStop(0.12, body); paint.addColorStop(0.8, body); paint.addColorStop(1, "#14202b"); }
-  ctx.fillStyle = paint; roundedRect(-33, -64, 66, 128, 15); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.36)"; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = jackpot ? "rgba(50,30,0,0.72)" : "rgba(7,17,26,0.82)";
-  roundedRect(-23, -43, 46, 32, 9); ctx.fill(); roundedRect(-22, 14, 44, 31, 9); ctx.fill();
-  ctx.fillStyle = jackpot ? "#fff8bf" : "#ffe58b"; ctx.fillRect(-25, -68, 14, 7); ctx.fillRect(11, -68, 14, 7);
-  ctx.fillStyle = jackpot ? "#ffef8a" : "#ff5d58"; ctx.fillRect(-25, 61, 14, 6); ctx.fillRect(11, 61, 14, 6);
+  const paint = ctx.createLinearGradient(-22, -48, 22, 48);
+  paint.addColorStop(0, "#ffffff");
+  paint.addColorStop(0.12, body);
+  paint.addColorStop(0.82, body);
+  paint.addColorStop(1, "#14202b");
+  ctx.fillStyle = paint;
+  roundedRect(-21, -50, 42, 100, 11);
+  ctx.fillStyle = trim;
+  roundedRect(-14, -31, 28, 24, 7);
+  roundedRect(-13, 12, 26, 22, 7);
+  ctx.fillStyle = "#f7f7f2";
+  ctx.fillRect(-15, -51, 10, 5);
+  ctx.fillRect(5, -51, 10, 5);
+  if (hat === "cap") {
+    ctx.fillStyle = "#f7f7f2";
+    roundedRect(-13, -65, 26, 8, 4);
+  } else if (hat === "crown") {
+    ctx.fillStyle = "#ffd447";
+    ctx.beginPath();
+    ctx.moveTo(-16, -58); ctx.lineTo(-10, -72); ctx.lineTo(-2, -60); ctx.lineTo(6, -73); ctx.lineTo(13, -59); ctx.lineTo(15, -58); ctx.closePath();
+    ctx.fill();
+  } else if (hat === "spoiler") {
+    ctx.fillStyle = "#b97cff";
+    roundedRect(-24, -63, 48, 7, 4);
+  } else if (hat === "halo") {
+    ctx.strokeStyle = "#f7f7f2";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(0, -64, 20, 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
 function drawObstacle(o) {
   const laneX = o && o.road === undefined && typeof o.lane === "number" && lanes[o.lane] !== undefined ? lanes[o.lane] : o.x;
   o.x = laneX;
-  const compact = laneModeCompactScale() && o.road === undefined;
+  laneSafeEntity(o);
+  const size = laneSafeObstacleSize(o.id);
   ctx.save();
   ctx.translate(roadX(laneX), o.y);
-  ctx.scale(compact ? 0.34 : 0.68, compact ? 0.58 : 0.78);
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath(); ctx.ellipse(0, 14, o.width * 0.48, o.height * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath(); ctx.ellipse(0, 11, size.width * 0.52, size.height * 0.22, 0, 0, Math.PI * 2); ctx.fill();
   if (o.id === "cone") {
-    ctx.fillStyle = "#ff8a34"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(28, 30); ctx.lineTo(-28, 30); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-22, 12, 44, 8);
+    ctx.fillStyle = "#ff8a34";
+    ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(17, 22); ctx.lineTo(-17, 22); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-14, 8, 28, 6);
   } else if (o.id === "barrier") {
-    ctx.fillStyle = "#f24f5f"; roundedRect(-58, -23, 116, 46, 8); ctx.fill();
-    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-44, -7, 88, 12);
+    ctx.fillStyle = "#f24f5f"; roundedRect(-27, -17, 54, 34, 7);
+    ctx.fillStyle = "#fff5d0"; ctx.fillRect(-20, -5, 40, 9);
   } else if (o.id === "parked") {
-    ctx.fillStyle = "#6cd0ff"; roundedRect(-50, -74, 100, 148, 15); ctx.fill();
-    ctx.fillStyle = "#10202d"; roundedRect(-31, -44, 62, 36, 8); ctx.fill(); roundedRect(-29, 16, 58, 34, 8); ctx.fill();
-    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-36, -76, 18, 8); ctx.fillRect(18, -76, 18, 8);
+    ctx.fillStyle = "#6cd0ff"; roundedRect(-25, -43, 50, 86, 10);
+    ctx.fillStyle = "#10202d"; roundedRect(-15, -26, 30, 22, 6); roundedRect(-14, 12, 28, 20, 6);
+    ctx.fillStyle = "#f7f7f2"; ctx.fillRect(-16, -44, 9, 5); ctx.fillRect(7, -44, 9, 5);
   } else if (o.id === "oil") {
-    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 64, 32, -0.1, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-18, -8, 22, 9, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#08090d"; ctx.beginPath(); ctx.ellipse(0, 0, 27, 15, -0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-8, -4, 10, 4, -0.4, 0, Math.PI * 2); ctx.fill();
   } else {
-    ctx.fillStyle = "#f7f7f2"; roundedRect(-72, -27, 144, 54, 8); ctx.fill();
-    ctx.fillStyle = "#ff4f64"; for (let x = -58; x < 60; x += 36) ctx.fillRect(x, -24, 18, 48);
+    ctx.fillStyle = "#f7f7f2"; roundedRect(-29, -17, 58, 34, 7);
+    ctx.fillStyle = "#ff4f64"; for (let x = -22; x < 24; x += 18) ctx.fillRect(x, -14, 9, 28);
   }
   ctx.restore();
 }
 
-state.buildVersion = "premium-rehan-gold-v19";
+function drawPickup(pickup) {
+  const laneX = pickup && pickup.road === undefined && typeof pickup.lane === "number" && lanes[pickup.lane] !== undefined ? lanes[pickup.lane] : pickup.x;
+  pickup.x = laneX;
+  laneSafeEntity(pickup);
+  const radius = pickup.id === "gold-jackpot" ? 23 : LANE_SAFE.pickupRadius;
+  ctx.save();
+  ctx.translate(roadX(laneX), pickup.y);
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath(); ctx.arc(3, 4, radius + 4, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowColor = pickup.color;
+  ctx.shadowBlur = pickup.id === "gold-jackpot" ? 22 : 12;
+  const grad = ctx.createRadialGradient(-6, -8, 3, 0, 0, radius + 2);
+  grad.addColorStop(0, "#fff8bf"); grad.addColorStop(0.48, pickup.color); grad.addColorStop(1, pickup.id === "gold-jackpot" ? "#b97800" : pickup.color);
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#111318";
+  ctx.font = pickup.id === "gold-jackpot" ? "900 17px sans-serif" : "900 16px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const label = { life: "+", autopilot: "A", immortal: "I", cash: "$", "cash-multiplier": "x2", "gold-jackpot": "G" }[pickup.id] || "$";
+  ctx.fillText(label, 0, 1);
+  ctx.textBaseline = "alphabetic";
+  ctx.restore();
+}
+
+state.buildVersion = "premium-rehan-gold-v27";
+if (["menu", "info", "shop"].includes(state.mode)) {
+  showMenu();
+  updateHud();
+}
+
+/* premium-rehan-gold-v28: Split Heist is versus, and non-solo modes are off leaderboards. */
+function leaderboardModesForMenu() {
+  return ["easy", "medium", "hard"];
+}
+
+function cleanNonSoloLeaderboards() {
+  const boards = getLeaderboards();
+  let changed = false;
+  for (const key of ["laneSurge", "duoDash", "testmode"]) {
+    if (boards[key]) {
+      delete boards[key];
+      changed = true;
+    }
+  }
+  if (changed) saveLeaderboards(boards);
+}
+cleanNonSoloLeaderboards();
+
+function recordScore() {
+  bankRunCash();
+  if (!["easy", "medium", "hard"].includes(state.selectedMode)) return;
+  const boards = getLeaderboards();
+  const mode = state.selectedMode;
+  const name = state.username || "Driver";
+  const list = boards[mode] || [];
+  const existing = list.find((entry) => entry.name.toLowerCase() === name.toLowerCase());
+  if (existing) existing.score = Math.max(existing.score, Math.round(state.score));
+  else list.push({ name, score: Math.round(state.score) });
+  boards[mode] = list.sort((a, b) => b.score - a.score).slice(0, 6);
+  saveLeaderboards(boards);
+}
+
+function menuHtml() {
+  const profile = getProfile(state.username || "Driver");
+  const ownedPfps = pfps.filter((item) => profile.ownedPfps.includes(item.id));
+  const adminUnlocked = cleanName(profile.name).toLowerCase() === "rehanadmin";
+  const boardHtml = leaderboardModesForMenu().map(leaderboardCardHtml).join("");
+  const testButton = adminUnlocked
+    ? `<button data-start="testmode" type="button" class="testmode-button">testmode <small>Admin: golden jackpot lab</small></button>`
+    : "";
+  return `
+    <section class="hero-menu cinematic-menu">
+      <div class="hero-copy">
+        <p class="eyebrow">Endless arcade driving</p>
+        <h1 class="animated-title">Bolt Heist</h1>
+        <p class="subtitle">Dodge traffic, grab road cash, unlock wild cosmetics, and survive the wildest getaway modes.</p>
+      </div>
+      <div class="profile-badge premium-profile">
+        ${pfpHtml(profile.equippedPfp, "large")}
+        <span>${profile.name}</span>
+        <strong>$${profile.wallet}</strong>
+      </div>
+      <div class="menu-road-art" aria-hidden="true"><span></span><span></span><span></span></div>
+    </section>
+    <label class="name-field premium-name">
+      <span>Driver name</span>
+      <input id="driverName" maxlength="16" placeholder="Your name" value="${state.username}">
+    </label>
+    <div class="pfp-picker emoji-picker">${ownedPfps.map((item) => `<button data-equip-pfp="${item.id}" type="button" class="pfp-choice ${profile.equippedPfp === item.id ? "selected" : ""}">${pfpHtml(item.id)}<span>${item.name}</span></button>`).join("")}</div>
+    ${profileKey(profile.name) === "rehan" ? `<p class="rehan-banner">Rehan mode unlocked: every skin, pfp, and upgrade is yours.</p>` : ""}
+    ${adminUnlocked ? `<p class="rehan-banner admin-banner">Admin testing unlocked: testmode spawns the golden jackpot powerup.</p>` : ""}
+    <h2>Choose Mode</h2>
+    <div class="mode-grid premium-modes ${adminUnlocked ? "five-modes" : "four-modes"}">
+      <button data-start="easy" type="button">Easy <small>5 lives</small></button>
+      <button data-start="medium" type="button">Medium <small>3 lives</small></button>
+      <button data-start="hard" type="button">Hard <small>1 life</small></button>
+      <button data-start="duoDash" type="button">Split Heist <small>Versus: last driver wins</small></button>
+      ${testButton}
+    </div>
+    <div class="menu-actions big-actions">
+      <button data-view="shop" type="button">Shop</button>
+      <button data-view="info" type="button">Information</button>
+    </div>
+    <h2>Leaderboards</h2>
+    <div class="leaderboards aesthetic-leaderboards">${boardHtml}</div>
+  `;
+}
+
+function showDuoGameOver(winner, loser) {
+  state.mode = "gameover";
+  bankRunCash();
+  const left = state.duo?.players?.[0];
+  const right = state.duo?.players?.[1];
+  const winningPlayer = winner || (left?.alive ? left : right?.alive ? right : null);
+  const losingPlayer = loser || (winningPlayer === left ? right : left);
+  const title = winningPlayer ? `${winningPlayer.label} wins` : "No winner";
+  const detail = winningPlayer
+    ? `${losingPlayer?.label || "The other driver"} crashed out first. ${winningPlayer.label} wins after ${Math.round(state.score)} m.`
+    : `Both drivers crashed out after ${Math.round(state.score)} m.`;
+  ui.screen.classList.remove("hidden");
+  panel.innerHTML = `
+    <p class="eyebrow">Split Heist versus complete</p>
+    <h1>${title}</h1>
+    <p>${detail} Split Heist is a competition mode and does not save to leaderboards.</p>
+    <div class="actions"><button data-start="duoDash" type="button">Retry Split Heist</button><button data-view="menu" type="button">Menu</button></div>
+  `;
+  updateHud();
+}
+
+function duoHitObstacle(player, entity) {
+  entity.hit = true;
+  if (player.goldJackpot || player.immortal > 0 || player.recoveryShield > 0) {
+    player.speed = Math.max(70, player.speed - 4);
+    duoSetMessage(`${player.label} smashed through safely.`);
+    return;
+  }
+  if (player.invulnerable > 0) return;
+  player.lives -= 1;
+  player.invulnerable = 0.85;
+  player.speed = Math.max(45, player.speed - entity.penalty);
+  if (player.lives <= 0) {
+    player.alive = false;
+    player.speed = 0;
+    const winner = state.duo.players.find((candidate) => candidate !== player && candidate.alive);
+    duoSetMessage(`${player.label} is out. ${winner?.label || "The other driver"} wins.`);
+    showDuoGameOver(winner, player);
+    return;
+  }
+  duoSetMessage(`${player.label} lost a life.`);
+}
+
+state.buildVersion = "premium-rehan-gold-v28";
 if (["menu", "info", "shop"].includes(state.mode)) {
   showMenu();
   updateHud();

@@ -956,3 +956,35 @@ button:hover,
 }
 
 /* v11: menu runtime boot fix */
+
+/* premium-rehan-gold-v21: admin test mode layout */
+.six-modes,
+.six-boards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.testmode-button,
+.six-modes .testmode-button {
+  color: #081018;
+  background: linear-gradient(135deg, #ff4f64, #ffd15c 48%, #f8fbff);
+  box-shadow: 0 18px 34px rgba(255, 79, 100, 0.24);
+}
+
+.admin-banner {
+  background: linear-gradient(135deg, rgba(255,79,100,0.22), rgba(255,209,92,0.18));
+  border-color: rgba(255, 209, 92, 0.44);
+}
+
+@media (max-width: 900px) {
+  .six-modes,
+  .six-boards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .six-modes,
+  .six-boards {
+    grid-template-columns: 1fr;
+  }
+}
